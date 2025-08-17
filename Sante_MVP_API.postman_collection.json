@@ -1,0 +1,870 @@
+{
+  "info": {
+    "name": "Santé MVP API - Tests Complets",
+    "description": "Collection complète pour tester l'API de l'application de santé MVP",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔑 Authentication",
+      "item": [
+        {
+          "name": "🏥 API Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test(\"API is operational\", function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "👑 Login Super Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@sante-app.fr\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set(\"superAdminToken\", response.data.token);",
+                  "    console.log(\"Super Admin Token saved\");",
+                  "}",
+                  "",
+                  "pm.test(\"Login successful\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.user.role).to.eql(\"super_admin\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "🏥 Login Hospital Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin.chu-paris@sante-app.fr\",\n  \"password\": \"hospital123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set(\"hospitalAdminToken\", response.data.token);",
+                  "    console.log(\"Hospital Admin Token saved\");",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "🧪 Login Lab Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin.cerba@sante-app.fr\",\n  \"password\": \"lab123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set(\"labAdminToken\", response.data.token);",
+                  "    console.log(\"Lab Admin Token saved\");",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "👩‍⚕️ Login Doctor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"dr.bernard@chu-paris.fr\",\n  \"password\": \"staff123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set(\"doctorToken\", response.data.token);",
+                  "    console.log(\"Doctor Token saved\");",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "👤 Login Patient",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"jean.dupont@email.fr\",\n  \"password\": \"patient123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set(\"patientToken\", response.data.token);",
+                  "    console.log(\"Patient Token saved\");",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "👥 Patient Management",
+      "item": [
+        {
+          "name": "📊 Patient Stats (Hospital Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hospitalAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/patients/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "patients", "stats"]
+            }
+          }
+        },
+        {
+          "name": "📋 List Patients (Hospital Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hospitalAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/patients?page=1&limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "patients"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.data.patients.length > 0) {",
+                  "        pm.environment.set(\"testPatientId\", response.data.patients[0].patient.id);",
+                  "        console.log(\"Test Patient ID:\", response.data.patients[0].patient.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "👤 Get Patient Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hospitalAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/patients/{{testPatientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "patients", "{{testPatientId}}"]
+            }
+          }
+        },
+        {
+          "name": "➕ Create New Patient",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hospitalAdminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nouveau.patient@test.fr\",\n  \"password\": \"patient123\",\n  \"first_name\": \"Nouveau\",\n  \"last_name\": \"Patient\",\n  \"phone\": \"06 99 88 77 66\",\n  \"date_of_birth\": \"1990-01-01\",\n  \"gender\": \"M\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/patients",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "patients"]
+            }
+          }
+        },
+        {
+          "name": "✏️ Update Patient",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hospitalAdminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"06 11 22 33 44\",\n  \"is_active\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/admin/patients/{{testPatientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "patients", "{{testPatientId}}"]
+            }
+          }
+        },
+        {
+          "name": "🚫 Access Denied - Patient List (Patient Role)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patientToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/patients",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "patients"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Access denied for patient role\", function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "📄 Document Management",
+      "item": [
+        {
+          "name": "📋 Get Patient Documents (Patient)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patientToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/documents/patient/{{testPatientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["documents", "patient", "{{testPatientId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.data.documents.length > 0) {",
+                  "        pm.environment.set(\"testDocumentId\", response.data.documents[0].id);",
+                  "        console.log(\"Test Document ID:\", response.data.documents[0].id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "📋 Get Patient Documents (Doctor)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctorToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/documents/patient/{{testPatientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["documents", "patient", "{{testPatientId}}"]
+            }
+          }
+        },
+        {
+          "name": "👁️ View Document (Patient)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patientToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/documents/{{testDocumentId}}/view",
+              "host": ["{{baseUrl}}"],
+              "path": ["documents", "{{testDocumentId}}", "view"]
+            }
+          }
+        },
+        {
+          "name": "🤖 AI Explanation (Patient Only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patientToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/documents/{{testDocumentId}}/ai-explanation",
+              "host": ["{{baseUrl}}"],
+              "path": ["documents", "{{testDocumentId}}", "ai-explanation"]
+            }
+          }
+        },
+        {
+          "name": "🚫 AI Explanation Denied (Doctor)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctorToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/documents/{{testDocumentId}}/ai-explanation",
+              "host": ["{{baseUrl}}"],
+              "path": ["documents", "{{testDocumentId}}", "ai-explanation"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"AI explanation denied for non-patient\", function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "🚫 Access Other Patient Documents",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patientToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/documents/patient/999",
+              "host": ["{{baseUrl}}"],
+              "path": ["documents", "patient", "999"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Access denied to other patient documents\", function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🏢 Establishments",
+      "item": [
+        {
+          "name": "🏥 List Hospitals",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patientToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/hospitals",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "hospitals"]
+            }
+          }
+        },
+        {
+          "name": "🧪 List Laboratories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patientToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/laboratories",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "laboratories"]
+            }
+          }
+        },
+        {
+          "name": "📊 General Stats (Super Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "stats"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "💬 Messaging",
+      "item": [
+        {
+          "name": "📋 List Conversations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patientToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/messages/conversations",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages", "conversations"]
+            }
+          }
+        },
+        {
+          "name": "🔍 Search Contacts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patientToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/messages/contacts?search=bernard",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages", "contacts"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "bernard"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "📊 Message Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patientToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/messages/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["messages", "stats"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🚫 Security Tests",
+      "item": [
+        {
+          "name": "🔒 No Token Access",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/admin/patients",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "patients"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Unauthorized without token\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "🔒 Invalid Token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer invalid_token_here"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/patients",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "patients"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Invalid token rejected\", function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "🔒 SQL Injection Test",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/patients/1'; DROP TABLE users; --",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "patients", "1'; DROP TABLE users; --"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"SQL injection blocked\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "🔒 XSS in Search",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hospitalAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/patients?search=<script>alert('xss')</script>",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "patients"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "<script>alert('xss')</script>"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🧪 Edge Cases",
+      "item": [
+        {
+          "name": "📄 Non-existent Document",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patientToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/documents/99999/view",
+              "host": ["{{baseUrl}}"],
+              "path": ["documents", "99999", "view"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Non-existent document returns 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "👤 Non-existent Patient",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hospitalAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/patients/99999",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "patients", "99999"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Non-existent patient returns 404\", function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "📊 Invalid Pagination",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{hospitalAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/patients?page=-1&limit=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["admin", "patients"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "-1"
+                },
+                {
+                  "key": "limit",
+                  "value": "0"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Invalid pagination parameters rejected\", function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

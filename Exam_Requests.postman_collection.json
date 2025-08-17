@@ -1,0 +1,729 @@
+{
+  "info": {
+    "name": "🧪 Demandes d'Examens de Laboratoire",
+    "description": "Collection pour tester la nouvelle fonctionnalité de demandes d'examens entre hôpitaux et laboratoires",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔑 Authentication",
+      "item": [
+        {
+          "name": "👩‍⚕️ Login Doctor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"dr.bernard@chu-paris.fr\",\n  \"password\": \"staff123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set(\"doctorToken\", response.data.token);",
+                  "    console.log(\"Doctor Token saved\");",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "🧪 Login Lab Staff",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"tech.dupont@cerba.fr\",\n  \"password\": \"staff123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set(\"labStaffToken\", response.data.token);",
+                  "    console.log(\"Lab Staff Token saved\");",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "📊 Statistics",
+      "item": [
+        {
+          "name": "📊 Exam Stats (Doctor)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctorToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests",
+                "stats"
+              ]
+            }
+          }
+        },
+        {
+          "name": "📊 Exam Stats (Lab Staff)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{labStaffToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests",
+                "stats"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📋 List Exam Requests",
+      "item": [
+        {
+          "name": "📋 List All (Doctor)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctorToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests?page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "📋 List with Filters",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctorToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests?status=pending&priority=urgent&exam_type=blood_test",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending"
+                },
+                {
+                  "key": "priority",
+                  "value": "urgent"
+                },
+                {
+                  "key": "exam_type",
+                  "value": "blood_test"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "🔍 Search by Patient",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctorToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests?patient_search=dupont",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests"
+              ],
+              "query": [
+                {
+                  "key": "patient_search",
+                  "value": "dupont"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "🚨 Urgent Requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{labStaffToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests/urgent",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests",
+                "urgent"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📝 Create Exam Requests",
+      "item": [
+        {
+          "name": "🩸 Blood Test Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctorToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient_id\": 1,\n  \"laboratory_id\": 1,\n  \"exam_type\": \"blood_test\",\n  \"priority\": \"high\",\n  \"clinical_info\": \"Patient présente des symptômes de fatigue chronique et pâleur. Suspicion d'anémie ferriprive. Demande bilan hématologique complet pour diagnostic différentiel.\",\n  \"requested_tests\": [\n    \"Hémogramme complet (NFS)\",\n    \"Fer sérique\",\n    \"Ferritine\",\n    \"Transferrine\",\n    \"Coefficient de saturation\",\n    \"Vitamine B12\",\n    \"Folates\",\n    \"Réticulocytes\"\n  ],\n  \"notes\": \"Patient anxieux, prévoir prise de sang en douceur. Jeûne de 12h respecté.\",\n  \"scheduled_at\": \"2025-08-15T09:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const response = pm.response.json();",
+                  "    pm.environment.set(\"testExamRequestId\", response.data.examRequest.id);",
+                  "    console.log(\"Exam Request ID saved:\", response.data.examRequest.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "🧪 Urine Test Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctorToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient_id\": 2,\n  \"laboratory_id\": 2,\n  \"exam_type\": \"urine_test\",\n  \"priority\": \"normal\",\n  \"clinical_info\": \"Contrôle de routine dans le cadre du suivi de grossesse au 2ème trimestre. Recherche d'infection urinaire asymptomatique et surveillance de la protéinurie.\",\n  \"requested_tests\": [\n    \"ECBU (Examen cytobactériologique des urines)\",\n    \"Protéinurie des 24h\",\n    \"Glycosurie\",\n    \"Cétonurie\",\n    \"Microalbuminurie\"\n  ],\n  \"notes\": \"Patiente enceinte de 24 semaines. Antécédents d'infections urinaires récidivantes.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests"
+              ]
+            }
+          }
+        },
+        {
+          "name": "🚨 Urgent Cardiac Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctorToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient_id\": 3,\n  \"laboratory_id\": 1,\n  \"exam_type\": \"biochemistry\",\n  \"priority\": \"urgent\",\n  \"clinical_info\": \"Patient admis aux urgences pour douleurs thoraciques. Suspicion d'infarctus du myocarde. Demande dosage des marqueurs cardiaques en urgence.\",\n  \"requested_tests\": [\n    \"Troponine I\",\n    \"CK-MB\",\n    \"Myoglobine\",\n    \"LDH\",\n    \"ASAT\",\n    \"ALAT\"\n  ],\n  \"notes\": \"URGENCE VITALE - Résultats demandés dans l'heure\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "👁️ View Exam Requests",
+      "item": [
+        {
+          "name": "👁️ Get Exam Request Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctorToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests/{{testExamRequestId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests",
+                "{{testExamRequestId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "📋 Patient Exam Requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctorToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests/patient/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests",
+                "patient",
+                "1"
+              ]
+            }
+          }
+        },
+        {
+          "name": "📊 Exam Request History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctorToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests/{{testExamRequestId}}/history",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests",
+                "{{testExamRequestId}}",
+                "history"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "✏️ Update Status (Lab Staff)",
+      "item": [
+        {
+          "name": "✅ Accept Request",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{labStaffToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"accepted\",\n  \"notes\": \"Demande acceptée. Programmation prévue pour demain matin 8h.\",\n  \"scheduled_at\": \"2025-08-13T08:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests/{{testExamRequestId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests",
+                "{{testExamRequestId}}",
+                "status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "📅 Schedule Exam",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{labStaffToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"scheduled\",\n  \"notes\": \"Examen programmé. Patient contacté et confirmé.\",\n  \"scheduled_at\": \"2025-08-13T08:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests/{{testExamRequestId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests",
+                "{{testExamRequestId}}",
+                "status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "🔄 Mark In Progress",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{labStaffToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"in_progress\",\n  \"notes\": \"Prélèvements effectués. Analyses en cours au laboratoire.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests/{{testExamRequestId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests",
+                "{{testExamRequestId}}",
+                "status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "✅ Mark Completed",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{labStaffToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"completed\",\n  \"notes\": \"Analyses terminées. Résultats en cours de validation.\",\n  \"completed_at\": \"2025-08-13T14:30:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests/{{testExamRequestId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests",
+                "{{testExamRequestId}}",
+                "status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "📋 Results Ready",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{labStaffToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"results_ready\",\n  \"notes\": \"Résultats validés et disponibles. Rapport envoyé au médecin demandeur.\",\n  \"results_ready_at\": \"2025-08-13T16:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests/{{testExamRequestId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests",
+                "{{testExamRequestId}}",
+                "status"
+              ]
+            }
+          }
+        },
+        {
+          "name": "❌ Reject Request",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{labStaffToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"rejected\",\n  \"notes\": \"Demande rejetée : informations cliniques insuffisantes. Merci de préciser les symptômes et l'indication médicale.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests/2/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests",
+                "2",
+                "status"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🚫 Security Tests",
+      "item": [
+        {
+          "name": "🚫 Patient Cannot Create Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{patientToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patient_id\": 1,\n  \"laboratory_id\": 1,\n  \"exam_type\": \"blood_test\",\n  \"priority\": \"normal\",\n  \"clinical_info\": \"Je voudrais des analyses\",\n  \"requested_tests\": [\"Hémogramme\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Patient cannot create exam request\", function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "🚫 Doctor Cannot Update Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doctorToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"accepted\",\n  \"notes\": \"Tentative de modification par médecin\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/exam-requests/1/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "exam-requests",
+                "1",
+                "status"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Doctor cannot update exam status\", function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

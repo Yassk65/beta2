@@ -1,0 +1,244 @@
+// Schéma Prisma MVP ULTRA-SIMPLIFIÉ - VERSION CORRIGÉE
+// 📅 Créé le : 11 Août 2025
+// 🎯 Objectif : MVP réaliste avec données essentielles uniquement
+// 🔧 Fix : Tailles VARCHAR compatibles MySQL (191 max pour index)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// TABLE UTILISATEURS UNIFIÉE - VERSION MVP CORRIGÉE
+// ============================================================================
+
+model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique @db.VarChar(191)  // 191 pour compatibilité MySQL
+  password_hash String    @db.VarChar(255)
+  first_name    String?   @db.VarChar(100)
+  last_name     String?   @db.VarChar(100)
+  phone         String?   @db.VarChar(20)
+  
+  // Rôle simplifié
+  role          UserRole  @default(patient)
+  
+  // Références vers établissements (NULL pour patients et super_admin)
+  hospital_id   Int?
+  laboratory_id Int?
+  
+  // Statut de base
+  is_active     Boolean   @default(true)
+  last_seen     DateTime?
+  
+  // Métadonnées
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  
+  // Relations essentielles
+  hospital                  Hospital?   @relation(fields: [hospital_id], references: [id], onDelete: SetNull)
+  laboratory                Laboratory? @relation(fields: [laboratory_id], references: [id], onDelete: SetNull)
+  patient                   Patient?
+  documents                 Document[]
+  messages_sent             Message[]
+  conversation_participants ConversationParticipant[]
+  
+  @@index([email])
+  @@index([role])
+  @@index([hospital_id])
+  @@index([laboratory_id])
+  @@map("users")
+}
+
+// ============================================================================
+// PROFIL PATIENT MINIMAL
+// ============================================================================
+
+model Patient {
+  id              Int      @id @default(autoincrement())
+  user_id         Int      @unique
+  date_of_birth   DateTime?
+  gender          Gender?
+  phone           String?  @db.VarChar(20)
+  
+  // Relations
+  user            User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  documents       Document[]
+  
+  @@map("patients")
+}
+
+// ============================================================================
+// ÉTABLISSEMENTS SIMPLIFIÉS
+// ============================================================================
+
+model Hospital {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(191)  // 191 pour compatibilité
+  address     String   @db.Text
+  city        String   @db.VarChar(100)
+  phone       String?  @db.VarChar(20)
+  email       String?  @db.VarChar(191)  // 191 pour compatibilité
+  
+  // Géolocalisation basique
+  latitude    Float?
+  longitude   Float?
+  
+  // Statut
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  
+  // Relations
+  users       User[]
+  documents   Document[]
+  
+  @@index([city])
+  @@index([is_active])
+  @@map("hospitals")
+}
+
+model Laboratory {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(191)  // 191 pour compatibilité
+  address     String   @db.Text
+  city        String   @db.VarChar(100)
+  phone       String?  @db.VarChar(20)
+  email       String?  @db.VarChar(191)  // 191 pour compatibilité
+  
+  // Géolocalisation basique
+  latitude    Float?
+  longitude   Float?
+  
+  // Statut
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  
+  // Relations
+  users       User[]
+  documents   Document[]
+  
+  @@index([city])
+  @@index([is_active])
+  @@map("laboratories")
+}
+
+// ============================================================================
+// DOCUMENTS MÉDICAUX BASIQUES
+// ============================================================================
+
+model Document {
+  id                Int         @id @default(autoincrement())
+  patient_id        Int
+  uploaded_by       Int
+  hospital_id       Int?
+  laboratory_id     Int?
+  
+  // Fichier
+  filename          String      @db.VarChar(191)  // 191 pour compatibilité
+  file_path         String      @db.VarChar(500)
+  file_size         Int
+  
+  // Type de document
+  document_type     DocumentType @default(other)
+  
+  // Métadonnées
+  created_at        DateTime    @default(now())
+  
+  // Relations
+  patient           Patient     @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+  uploader          User        @relation(fields: [uploaded_by], references: [id], onDelete: Restrict)
+  hospital          Hospital?   @relation(fields: [hospital_id], references: [id], onDelete: SetNull)
+  laboratory        Laboratory? @relation(fields: [laboratory_id], references: [id], onDelete: SetNull)
+  
+  @@index([patient_id])
+  @@index([document_type])
+  @@map("documents")
+}
+
+// ============================================================================
+// MESSAGERIE BASIQUE
+// ============================================================================
+
+model Conversation {
+  id          Int       @id @default(autoincrement())
+  title       String?   @db.VarChar(191)  // 191 pour compatibilité
+  created_by  Int
+  created_at  DateTime  @default(now())
+  
+  // Relations
+  messages    Message[]
+  participants ConversationParticipant[]
+  
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id              Int          @id @default(autoincrement())
+  conversation_id Int
+  user_id         Int
+  joined_at       DateTime     @default(now())
+  
+  // Relations
+  conversation    Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@unique([conversation_id, user_id])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id              Int          @id @default(autoincrement())
+  conversation_id Int
+  sender_id       Int
+  content         String       @db.Text
+  created_at      DateTime     @default(now())
+  
+  // Relations
+  conversation    Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  sender          User         @relation(fields: [sender_id], references: [id], onDelete: Cascade)
+  
+  @@index([conversation_id, created_at])
+  @@map("messages")
+}
+
+// ============================================================================
+// ENUMS SIMPLIFIÉS
+// ============================================================================
+
+enum UserRole {
+  patient
+  hospital_staff
+  hospital_admin
+  lab_staff
+  lab_admin
+  super_admin
+}
+
+enum Gender {
+  M
+  F
+  Other
+}
+
+enum DocumentType {
+  lab_result
+  prescription
+  medical_report
+  other
+}
+
+// ============================================================================
+// NOTES MVP CORRIGÉES
+// ============================================================================
+
+// 1. VARCHAR(191) au lieu de VARCHAR(255) pour compatibilité MySQL utf8mb4
+// 2. Structure ultra-simplifiée pour un déploiement rapide
+// 3. Géolocalisation basique avec Float (pas de PostGIS)
+// 4. Messagerie simple sans statuts de lecture
+// 5. Documents basiques sans permissions complexes
+// 6. Pas de notifications push (à ajouter plus tard)
+// 7. Pas d'examens/rendez-vous (à ajouter plus tard)

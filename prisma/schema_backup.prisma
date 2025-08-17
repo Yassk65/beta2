@@ -1,0 +1,158 @@
+// Nouveau schéma Prisma pour la structure multi-tables
+// 📅 Créé le : 8 Août 2025
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Admin {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique @db.VarChar(191)
+  mot_de_passe String    @db.VarChar(255)
+  nom          String?   @db.VarChar(100)
+  prenom       String?   @db.VarChar(100)
+  telephone    String?   @db.VarChar(20)
+  role         AdminRole @default(super_admin)
+  is_active    Boolean   @default(true)
+  last_login   DateTime?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  @@map("admins")
+}
+
+model Patient {
+  id           Int      @id @default(autoincrement())
+  nom          String?  @db.VarChar(100)
+  prenom       String?  @db.VarChar(100)
+  email        String   @unique @db.VarChar(191)
+  telephone    String?  @db.VarChar(20)
+  mot_de_passe String   @db.VarChar(255)
+  photo_profil String?  @db.Text
+  created_at   DateTime @default(now())
+
+  @@map("patients")
+}
+
+model Hospital {
+  id          Int      @id @default(autoincrement())
+  nom         String?  @db.VarChar(191)
+  adresse     String?  @db.Text
+  ville       String?  @db.VarChar(100)
+  pays        String?  @db.VarChar(100)
+  telephone   String?  @db.VarChar(20)
+  email       String?  @db.VarChar(191)
+  description String?  @db.Text
+  created_at  DateTime @default(now())
+
+  // Relations
+  admins HospitalAdmin[]
+  staff  HospitalStaff[]
+
+  @@map("hospitals")
+}
+
+model HospitalAdmin {
+  id           Int      @id @default(autoincrement())
+  hospital_id  Int
+  email        String   @unique @db.VarChar(191)
+  mot_de_passe String   @db.VarChar(255)
+  nom          String?  @db.VarChar(100)
+  prenom       String?  @db.VarChar(100)
+  created_at   DateTime @default(now())
+
+  // Relations
+  hospital Hospital @relation(fields: [hospital_id], references: [id], onDelete: Cascade)
+
+  @@map("hospital_admins")
+}
+
+model HospitalStaff {
+  id           Int                    @id @default(autoincrement())
+  hospital_id  Int
+  nom          String?                @db.VarChar(100)
+  prenom       String?                @db.VarChar(100)
+  email        String                 @unique @db.VarChar(191)
+  telephone    String?                @db.VarChar(20)
+  mot_de_passe String                 @db.VarChar(255)
+  role         HospitalStaffRole      @default(medecin)
+  created_at   DateTime               @default(now())
+
+  // Relations
+  hospital Hospital @relation(fields: [hospital_id], references: [id], onDelete: Cascade)
+
+  @@map("hospital_staff")
+}
+
+model Laboratory {
+  id          Int      @id @default(autoincrement())
+  nom         String?  @db.VarChar(191)
+  adresse     String?  @db.Text
+  ville       String?  @db.VarChar(100)
+  pays        String?  @db.VarChar(100)
+  telephone   String?  @db.VarChar(20)
+  email       String?  @db.VarChar(191)
+  description String?  @db.Text
+  created_at  DateTime @default(now())
+
+  // Relations
+  admins LabAdmin[]
+  staff  LabStaff[]
+
+  @@map("laboratories")
+}
+
+model LabAdmin {
+  id           Int      @id @default(autoincrement())
+  lab_id       Int
+  email        String   @unique @db.VarChar(191)
+  mot_de_passe String   @db.VarChar(255)
+  nom          String?  @db.VarChar(100)
+  prenom       String?  @db.VarChar(100)
+  created_at   DateTime @default(now())
+
+  // Relations
+  laboratory Laboratory @relation(fields: [lab_id], references: [id], onDelete: Cascade)
+
+  @@map("lab_admins")
+}
+
+model LabStaff {
+  id           Int           @id @default(autoincrement())
+  lab_id       Int
+  nom          String?       @db.VarChar(100)
+  prenom       String?       @db.VarChar(100)
+  email        String        @unique @db.VarChar(191)
+  telephone    String?       @db.VarChar(20)
+  mot_de_passe String        @db.VarChar(255)
+  poste        LabStaffRole  @default(technicien)
+  created_at   DateTime      @default(now())
+
+  // Relations
+  laboratory Laboratory @relation(fields: [lab_id], references: [id], onDelete: Cascade)
+
+  @@map("lab_staff")
+}
+
+enum AdminRole {
+  super_admin
+  system_admin
+  support_admin
+}
+
+enum HospitalStaffRole {
+  medecin
+  infirmier
+  autre
+}
+
+enum LabStaffRole {
+  technicien
+  responsable
+  autre
+}

@@ -1,0 +1,486 @@
+{
+  "info": {
+    "name": "Medical Chat Bot API",
+    "description": "Collection pour tester le chat médical avec bot IA via OpenRouter",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "medical-chat-bot-api",
+    "version": {
+      "major": 1,
+      "minor": 0,
+      "patch": 0
+    }
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{patient_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-login si pas de token",
+          "if (!pm.environment.get('patient_token')) {",
+          "    console.log('Pas de token patient, connexion automatique...');",
+          "    pm.sendRequest({",
+          "        url: pm.environment.get('base_url') + '/auth/login',",
+          "        method: 'POST',",
+          "        header: {",
+          "            'Content-Type': 'application/json'",
+          "        },",
+          "        body: {",
+          "            mode: 'raw',",
+          "            raw: JSON.stringify({",
+          "                email: 'marie.martin@email.com',",
+          "                password: 'password123'",
+          "            })",
+          "        }",
+          "    }, function (err, response) {",
+          "        if (response && response.json().success) {",
+          "            pm.environment.set('patient_token', response.json().data.token);",
+          "            console.log('✅ Connexion patient réussie');",
+          "        }",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login Patient",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Login successful', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.token).to.exist;",
+                  "    ",
+                  "    // Sauvegarder le token",
+                  "    pm.environment.set('patient_token', jsonData.data.token);",
+                  "    console.log('Token patient sauvegardé');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"marie.martin@email.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Medical Chat",
+      "item": [
+        {
+          "name": "Check Service Health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Service is healthy', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.service).to.eql('medical-chat');",
+                  "    console.log('OpenRouter Status:', jsonData.openrouter_status);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/medical-chat/health",
+              "host": ["{{base_url}}"],
+              "path": ["medical-chat", "health"]
+            }
+          }
+        },
+        {
+          "name": "Create Chat Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Session created successfully', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.session.id).to.exist;",
+                  "    pm.expect(jsonData.data.messages).to.have.lengthOf(2);",
+                  "    ",
+                  "    // Sauvegarder l'ID de session",
+                  "    pm.environment.set('session_id', jsonData.data.session.id);",
+                  "    console.log('Session ID:', jsonData.data.session.id);",
+                  "    console.log('Session Title:', jsonData.data.session.title);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Bonjour, j'ai des maux de tête depuis quelques jours et je m'inquiète. Pouvez-vous m'aider à comprendre ce que cela pourrait être ?\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/medical-chat/sessions",
+              "host": ["{{base_url}}"],
+              "path": ["medical-chat", "sessions"]
+            }
+          }
+        },
+        {
+          "name": "Send Message",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Message sent successfully', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.messages).to.have.lengthOf(2);",
+                  "    ",
+                  "    const botMessage = jsonData.data.messages.find(m => m.sender_type === 'bot');",
+                  "    pm.expect(botMessage).to.exist;",
+                  "    pm.expect(botMessage.confidence_score).to.be.above(0);",
+                  "    ",
+                  "    console.log('Bot response:', botMessage.content.substring(0, 100) + '...');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Les maux de tête sont-ils accompagnés de nausées ? J'ai aussi remarqué que j'ai du mal à me concentrer au travail.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/medical-chat/sessions/{{session_id}}/messages",
+              "host": ["{{base_url}}"],
+              "path": ["medical-chat", "sessions", "{{session_id}}", "messages"]
+            }
+          }
+        },
+        {
+          "name": "Get Chat Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Session retrieved successfully', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.session.id).to.exist;",
+                  "    pm.expect(jsonData.data.session.messages).to.be.an('array');",
+                  "    ",
+                  "    console.log('Messages in session:', jsonData.data.session.messages.length);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/medical-chat/sessions/{{session_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["medical-chat", "sessions", "{{session_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get All Sessions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Sessions retrieved successfully', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.sessions).to.be.an('array');",
+                  "    ",
+                  "    console.log('Total sessions:', jsonData.data.sessions.length);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/medical-chat/sessions",
+              "host": ["{{base_url}}"],
+              "path": ["medical-chat", "sessions"]
+            }
+          }
+        },
+        {
+          "name": "Get Statistics",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Statistics retrieved successfully', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data.statistics).to.exist;",
+                  "    ",
+                  "    const stats = jsonData.data.statistics;",
+                  "    console.log('Total sessions:', stats.total_sessions);",
+                  "    console.log('Total messages:', stats.total_messages);",
+                  "    console.log('Active sessions:', stats.active_sessions);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/medical-chat/statistics",
+              "host": ["{{base_url}}"],
+              "path": ["medical-chat", "statistics"]
+            }
+          }
+        },
+        {
+          "name": "End Chat Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Session ended successfully', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    console.log('Session ended:', jsonData.message);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/medical-chat/sessions/{{session_id}}/end",
+              "host": ["{{base_url}}"],
+              "path": ["medical-chat", "sessions", "{{session_id}}", "end"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Advanced Tests",
+      "item": [
+        {
+          "name": "Multiple Messages Conversation",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Créer une nouvelle session pour ce test",
+                  "pm.sendRequest({",
+                  "    url: pm.environment.get('base_url') + '/medical-chat/sessions',",
+                  "    method: 'POST',",
+                  "    header: {",
+                  "        'Content-Type': 'application/json',",
+                  "        'Authorization': 'Bearer ' + pm.environment.get('patient_token')",
+                  "    },",
+                  "    body: {",
+                  "        mode: 'raw',",
+                  "        raw: JSON.stringify({",
+                  "            message: 'Je ressens des douleurs abdominales depuis ce matin.'",
+                  "        })",
+                  "    }",
+                  "}, function (err, response) {",
+                  "    if (response && response.json().success) {",
+                  "        pm.environment.set('test_session_id', response.json().data.session.id);",
+                  "    }",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Multiple messages handled correctly', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    ",
+                  "    const botMessage = jsonData.data.messages.find(m => m.sender_type === 'bot');",
+                  "    pm.expect(botMessage.content).to.include.oneOf(['médecin', 'consulter', 'professionnel']);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"La douleur est-elle constante ou par vagues ? J'ai aussi de la fièvre.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/medical-chat/sessions/{{test_session_id}}/messages",
+              "host": ["{{base_url}}"],
+              "path": ["medical-chat", "sessions", "{{test_session_id}}", "messages"]
+            }
+          }
+        },
+        {
+          "name": "Error Handling - Invalid Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 404', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test('Error message is appropriate', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.false;",
+                  "    pm.expect(jsonData.message).to.include('Session');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Test message\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/medical-chat/sessions/99999/messages",
+              "host": ["{{base_url}}"],
+              "path": ["medical-chat", "sessions", "99999", "messages"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3002/api"
+    }
+  ]
+}
