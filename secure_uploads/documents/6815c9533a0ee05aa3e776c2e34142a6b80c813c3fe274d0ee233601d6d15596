@@ -1,0 +1,33 @@
+ Patient sans compte
+🔹 Sans connexion
+Accueil (mode liste uniquement) :
+Pas de Google Maps.
+Affiche une liste des établissements (hôpitaux + laboratoires) enregistrés localement (localStorage).
+Barre de recherche → fonctionne uniquement sur les données locales.
+ Avec connexion
+Accueil :
+Un bouton sélecteur Carte / Liste :
+Mode Carte :
+Google Maps avec positions des établissements récupérés du backend.
+En cliquant sur un établissement → affiche infos (nom, spécialité, contacts).
+Bouton → ouvrir l’itinéraire dans l’application Google Maps.
+Mode Liste :
+Liste dynamique des établissements récupérés du backend.
+Barre de recherche connectée à la BDD.
+Option de télécharger la liste en local → pour usage hors ligne.
+ Patient avec compte
+🔹 Sans connexion
+Accueil (mode liste uniquement) :
+Même logique que pour “sans compte” mais les données locales incluent aussi les établissements déjà synchronisés.
+Avec connexion
+Accueil :
+Bouton sélecteur Carte / Liste.
+Mode Carte : Google Maps avec positions.
+Mode Liste : liste dynamique depuis backend + barre recherche + téléchargement local.
+Assistant IA médical intégré.
+ Avec connexion
+Accueil :
+Bouton sélecteur Carte / Liste.
+Mode Carte : Google Maps avec positions.
+Mode Liste : liste dynamique depuis backend + barre recherche + téléchargement local.
+Assistant IA médical intégré(endpoint disponible depuis le backend ).

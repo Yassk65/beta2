@@ -127,15 +127,52 @@ router.get('/:id/view',
 );
 
 /**
- * 💾 DONNÉES HORS LIGNE D'UN DOCUMENT
+ * 🔐 VÉRIFIER L'ACCÈS EN TEMPS RÉEL (ANTI-OFFLINE)
+ * POST /api/documents/:id/verify-access
+ * 
+ * Permissions: Patient uniquement
+ * Response: { success, access_granted, session_valid }
+ */
+router.post('/:id/verify-access',
+  authenticateToken,
+  requireRoles(['patient']),
+  param('id').isInt({ min: 1 }).withMessage('ID document invalide'),
+  body('timestamp').optional().isISO8601().withMessage('Timestamp invalide'),
+  handleValidationErrors,
+  async (req, res) => {
+    const { verifyDocumentAccess } = require('../controllers/documentController');
+    verifyDocumentAccess(req, res);
+  }
+);
+
+/**
+ * 📱 TÉLÉCHARGEMENT SÉCURISÉ POUR STOCKAGE OFFLINE CHIFFRÉ
+ * GET /api/documents/:id/secure-download
+ * 
+ * Permissions: Patient propriétaire ou staff médical autorisé
+ * Response: Fichier binaire pour stockage chiffré offline
+ */
+router.get('/:id/secure-download',
+  authenticateToken,
+  requireRoles(['patient', 'hospital_staff', 'hospital_admin', 'lab_staff', 'lab_admin', 'super_admin']),
+  param('id').isInt({ min: 1 }).withMessage('ID document invalide'),
+  handleValidationErrors,
+  async (req, res) => {
+    const { secureDownloadForOffline } = require('../controllers/documentController');
+    secureDownloadForOffline(req, res);
+  }
+);
+
+/**
+ * 💾 DONNÉES HORS LIGNE D'UN DOCUMENT (DISABLED FOR PATIENTS)
  * GET /api/documents/:id/offline-data
  * 
- * Permissions: Patient propriétaire
+ * Permissions: Staff médical uniquement (plus de patients)
  * Response: { success, data: { content } }
  */
 router.get('/:id/offline-data',
   authenticateToken,
-  requireRoles(['patient']),
+  requireRoles(['hospital_staff', 'hospital_admin', 'lab_staff', 'lab_admin', 'super_admin']), // Patients exclus
   param('id').isInt({ min: 1 }).withMessage('ID document invalide'),
   handleValidationErrors,
   async (req, res) => {

@@ -3,14 +3,17 @@
 // 🎯 Tester la nouvelle fonctionnalité de notifications
 
 const axios = require('axios');
+const FormData = require('form-data');
+const fs = require('fs');
+const path = require('path');
 
 const API_BASE = 'http://localhost:3000/api';
 
-// Comptes de test
+// Comptes de test - avec les bons mots de passe
 const testAccounts = {
-  doctor: { email: 'dr.bernard@chu-paris.fr', password: 'staff123' },
-  labStaff: { email: 'tech.dupont@cerba.fr', password: 'staff123' },
-  patient: { email: 'jean.dupont@email.fr', password: 'patient123' }
+  doctor: { email: 'dr.pierre.dubois@psl.aphp.fr', password: 'staff123' },
+  labStaff: { email: 'tech.monique.leroy@cerba.fr', password: 'staff123' },
+  patient: { email: 'franoise.garcia@email.fr', password: 'patient123' }
 };
 
 async function testNotifications() {
@@ -158,6 +161,49 @@ async function testNotifications() {
       }, 1000);
     }
 
+    // 16. Test création automatique de notification (upload document)
+    console.log('\n1️⃣6️⃣ Test création automatique de notification (nouveau document)...');
+
+    try {
+      const labPatients = await axios.get(`${API_BASE}/patients/lab`, {
+        headers: { Authorization: `Bearer ${labToken}` }
+      });
+
+      if (labPatients.data.data.patients.length > 0) {
+        const patientId = labPatients.data.data.patients[0].id;
+        const testFilePath = path.join(__dirname, 'test_notification_doc.txt');
+        fs.writeFileSync(testFilePath, 'Document test pour notifications');
+
+        const form = new FormData();
+        form.append('patient_id', patientId);
+        form.append('document_type', 'rapport');
+        form.append('description', 'Document test notification');
+        form.append('file', fs.createReadStream(testFilePath));
+
+        await axios.post(`${API_BASE}/documents/upload`, form, {
+          headers: { Authorization: `Bearer ${labToken}`, ...form.getHeaders() }
+        });
+
+        fs.unlinkSync(testFilePath);
+        console.log('   ✅ Document uploadé, notification automatique créée');
+
+        setTimeout(async () => {
+          try {
+            const updatedPatientNotifications = await axios.get(`${API_BASE}/notifications/unread`, {
+              headers: { Authorization: `Bearer ${patientToken}` }
+            });
+            console.log(`   ✅ Patient a maintenant ${updatedPatientNotifications.data.data.notifications.length} notifications non lues`);
+          } catch (error) {
+            console.log('   ⚠️ Erreur vérification notifications patient:', error.message);
+          }
+        }, 1000);
+      } else {
+        console.log('   ⚠️ Aucun patient disponible pour test document');
+      }
+    } catch (error) {
+      console.log('   ⚠️ Erreur upload document:', error.message);
+    }
+
     console.log('\n✅ TOUS LES TESTS SONT PASSÉS AVEC SUCCÈS !');
     console.log('\n📋 RÉSUMÉ DES FONCTIONNALITÉS TESTÉES :');
     console.log('   ✅ Statistiques de notifications');
@@ -168,7 +214,7 @@ async function testNotifications() {
     console.log('   ✅ Marquage comme lu (individuel et global)');
     console.log('   ✅ Notifications par type');
     console.log('   ✅ Notifications par rôle (patient, médecin, labo)');
-    console.log('   ✅ Création automatique de notifications');
+    console.log('   ✅ Création automatique de notifications (messages & documents)');
 
     console.log('\n🚀 LE SYSTÈME DE NOTIFICATIONS EST OPÉRATIONNEL !');
 

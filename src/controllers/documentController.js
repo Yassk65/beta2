@@ -7,8 +7,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
 const crypto = require('crypto');
-const axios = require('axios');
 const { notifyNewDocument } = require('../services/notificationService');
+const openRouterService = require('../services/openRouterService');
 
 const prisma = new PrismaClient();
 
@@ -136,77 +136,42 @@ const extractTextFromDocument = async (filePath, mimeType) => {
 };
 
 /**
- * Appel à l'IA via OpenAI pour analyser le document
+ * Appel à l'IA via OpenRouter pour analyser le document
  */
-const callOpenAI = async (documentText, documentType, analysisType = 'summary') => {
+const callAI = async (documentText, documentType, analysisType = 'summary') => {
   try {
-    const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-    const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+    // Vérifier que le service OpenRouter est disponible
+    if (!openRouterService) {
+      throw new Error('Service OpenRouter non disponible');
+    }
+
+    // Utiliser le service OpenRouter pour analyser le document
+    const result = await openRouterService.analyzeDocument(
+      documentText, 
+      documentType, 
+      analysisType
+    );
     
-    if (!OPENAI_API_KEY) {
-      throw new Error('Clé API OpenAI non configurée');
-    }
-
-    let prompt;
-    if (analysisType === 'summary') {
-      prompt = `Tu es un assistant médical expert. Génère un résumé concis et compréhensible de ce document médical de type "${documentType}" pour un patient. Utilise un langage simple et accessible.
-
-Document à analyser :
-${documentText}
-
-Fournis un résumé structuré avec :
-1. **Résumé principal** (2-3 phrases)
-2. **Résultats clés** (points importants)
-3. **Recommandations** (si mentionnées)
-4. **Prochaines étapes** (si applicables)
-
-Reste factuel et ne donne pas de conseils médicaux spécifiques.`;
+    if (result.success) {
+      return result.content;
     } else {
-      prompt = `Tu es un assistant médical expert. Explique ce document médical de type "${documentType}" de manière détaillée et compréhensible pour un patient. Utilise un langage accessible, évite le jargon médical complexe.
-
-Document à analyser :
-${documentText}
-
-Fournis une explication complète avec :
-1. **Contexte** - De quoi parle ce document
-2. **Résultats détaillés** - Explication des valeurs et mesures
-3. **Signification clinique** - Ce que cela signifie pour la santé
-4. **Questions à poser** - Questions utiles pour le médecin
-
-Reste factuel et ne donne pas de conseils médicaux spécifiques.`;
+      console.error('Erreur analyse OpenRouter:', result.error);
+      return result.content; // Contient la réponse de fallback
     }
 
-    const response = await axios.post(OPENAI_URL, {
-      model: "gpt-3.5-turbo", // Modèle économique et performant
-      messages: [
-        {
-          role: "system",
-          content: "Tu es un assistant médical expert qui aide les patients à comprendre leurs documents médicaux. Réponds toujours en français."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      max_tokens: analysisType === 'summary' ? 800 : 1500,
-      temperature: 0.3
-    }, {
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      timeout: 30000 // 30 secondes timeout
-    });
-
-    return response.data.choices[0]?.message?.content || "Impossible de générer une analyse pour ce document.";
   } catch (error) {
-    console.error('Erreur appel OpenAI:', error);
-    if (error.response?.status === 401) {
-      return "Clé API OpenAI invalide. Veuillez contacter l'administrateur.";
-    } else if (error.response?.status === 429) {
-      return "Service temporairement surchargé. Veuillez réessayer dans quelques minutes.";
-    }
-    return "Service d'analyse temporairement indisponible. Veuillez contacter votre médecin pour plus d'informations.";
+    console.error('Erreur appel service IA:', error);
+    
+    // Réponse de fallback en cas d'erreur critique
+    const analysisWord = analysisType === 'summary' ? 'résumé' : 'explication';
+    return `Service d'analyse temporairement indisponible. Impossible de générer un ${analysisWord} pour ce document.
+
+**Recommandations importantes :**
+- Consultez votre médecin traitant pour l'interprétation de ce document
+- Apportez le document original lors de votre prochaine consultation
+- En cas d'urgence médicale, appelez le 15 (SAMU)
+
+⚠️ **Disclaimer médical :** Cet assistant ne remplace en aucun cas une consultation médicale professionnelle.`;
   }
 };
 
@@ -621,14 +586,40 @@ const getPatientDocuments = async (req, res) => {
 };
 
 /**
- * 👁️ VISUALISER UN DOCUMENT DE MANIÈRE SÉCURISÉE
+ * 👁️ VISUALISER UN DOCUMENT DE MANIÈRE SÉCURISÉE (ONLINE ONLY)
  * GET /api/documents/:id/view
  */
 const viewDocument = async (req, res) => {
   try {
     const { role, id: userId, hospital_id, laboratory_id } = req.user;
     const documentId = parseInt(req.params.id);
-    const { download = false } = req.query;
+    const { download = false, session_verify = true } = req.query;
+
+    // 🔒 SÉCURITÉ RENFORCÉE: Vérification de session en temps réel pour les patients
+    if (role === 'patient' && session_verify !== 'false') {
+      // Générer un token de session unique pour cette visualisation
+      const sessionToken = crypto.randomBytes(32).toString('hex');
+      const sessionExpiry = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+      
+      // Stocker le token de session en base pour vérification
+      await prisma.documentSessions.create({
+        data: {
+          document_id: documentId,
+          user_id: userId,
+          session_token: sessionToken,
+          expires_at: sessionExpiry,
+          ip_address: req.ip,
+          user_agent: req.get('User-Agent') || 'Unknown'
+        }
+      }).catch(console.error);
+
+      // Ajouter des headers anti-cache très stricts pour les patients
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
+      res.setHeader('X-Session-Token', sessionToken);
+    }
 
     // Récupérer le document avec ses relations
     const document = await prisma.document.findUnique({
@@ -651,7 +642,7 @@ const viewDocument = async (req, res) => {
     let canAccess = false;
 
     if (role === 'patient') {
-      // Un patient ne peut voir que ses propres documents
+      // Un patient ne peut voir que ses propres documents ET doit être en ligne
       if (document.patient.user_id === userId) {
         canAccess = true;
       }
@@ -693,16 +684,27 @@ const viewDocument = async (req, res) => {
         user_id: userId,
         access_type: download === 'true' ? 'download' : 'view',
         ip_address: req.ip,
-        user_agent: req.get('User-Agent') || 'Unknown'
+        user_agent: req.get('User-Agent') || 'Unknown',
+        is_offline_attempt: false // Toujours en ligne pour cette nouvelle logique
       }
     }).catch(console.error); // Ne pas faire échouer si l'audit échoue
 
-    // Pour les patients, on force la visualisation en ligne (pas de téléchargement direct)
-    if (role === 'patient' && download === 'true') {
-      return res.status(403).json({
-        success: false,
-        message: 'Téléchargement direct non autorisé. Utilisez la visualisation sécurisée.'
-      });
+    // 🚫 BLOQUER COMPLÈTEMENT LE TÉLÉCHARGEMENT POUR LES PATIENTS
+    if (role === 'patient') {
+      if (download === 'true') {
+        return res.status(403).json({
+          success: false,
+          message: 'Téléchargement interdit pour les patients. Utilisez uniquement la visualisation sécurisée en ligne.'
+        });
+      }
+      
+      // Ajouter des headers spéciaux pour empêcher la sauvegarde
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'DENY'); // Plus strict que SAMEORIGIN
+      res.setHeader('X-Download-Options', 'noopen');
+      res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
+      res.setHeader('Referrer-Policy', 'no-referrer');
+      res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'none'; object-src 'none';");
     }
 
     // Définir les headers sécurisés
@@ -795,11 +797,11 @@ const generateAISummary = async (req, res) => {
       });
     }
 
-    // Vérifier la clé OpenAI
-    if (!process.env.OPENAI_API_KEY) {
+    // Vérifier que le service OpenRouter est disponible
+    if (!openRouterService) {
       return res.status(503).json({
         success: false,
-        message: 'Service IA non configuré. Veuillez configurer la clé OpenAI.'
+        message: 'Service IA non configuré. Veuillez configurer le service OpenRouter.'
       });
     }
 
@@ -812,7 +814,7 @@ Taille: ${document.file_size} bytes
 Date: ${document.created_at}`;
 
     // Générer le résumé IA
-    const aiSummary = await callOpenAI(documentText, document.document_type, 'summary');
+    const aiSummary = await callAI(documentText, document.document_type, 'summary');
     
     // Créer un objet résumé temporaire
     const summary = {
@@ -1033,7 +1035,7 @@ const getTransferRecipients = async (req, res) => {
 };
 
 /**
- * 💾 OBTENIR LES DONNÉES HORS LIGNE D'UN DOCUMENT
+ * 🚫 BLOQUER L'ACCÈS HORS LIGNE AUX DONNÉES (SECURE)
  * GET /api/documents/:id/offline-data
  */
 const getOfflineData = async (req, res) => {
@@ -1041,15 +1043,17 @@ const getOfflineData = async (req, res) => {
     const { role, id: userId } = req.user;
     const documentId = parseInt(req.params.id);
 
-    // Seuls les patients peuvent obtenir les données hors ligne
-    if (role !== 'patient') {
+    // 🚫 COMPLÈTEMENT DÉSACTIVÉ POUR LES PATIENTS
+    if (role === 'patient') {
       return res.status(403).json({
         success: false,
-        message: 'Fonctionnalité réservée aux patients'
+        message: 'Accès hors ligne désactivé pour des raisons de sécurité. Connexion Internet requise pour consulter vos documents.',
+        require_online: true,
+        error_code: 'OFFLINE_ACCESS_DENIED'
       });
     }
 
-    // Récupérer le document
+    // Pour les autres rôles, maintenir la fonctionnalité existante
     const document = await prisma.document.findUnique({
       where: { id: documentId },
       include: {
@@ -1066,15 +1070,24 @@ const getOfflineData = async (req, res) => {
       });
     }
 
-    // Vérifier que le patient peut accéder à ce document
-    if (document.patient.user_id !== userId) {
+    // Vérifications de permissions pour le staff
+    let canAccess = false;
+    if (role === 'hospital_staff' || role === 'hospital_admin') {
+      canAccess = (document.hospital_id === req.user.hospital_id);
+    } else if (role === 'lab_staff' || role === 'lab_admin') {
+      canAccess = (document.laboratory_id === req.user.laboratory_id);
+    } else if (role === 'super_admin') {
+      canAccess = true;
+    }
+
+    if (!canAccess) {
       return res.status(403).json({
         success: false,
-        message: 'Accès non autorisé à ce document'
+        message: 'Accès non autorisé'
       });
     }
 
-    // Extraire les métadonnées pour consultation hors ligne
+    // Extraire les métadonnées pour consultation hors ligne (staff uniquement)
     const offlineData = {
       id: document.id,
       filename: document.filename,
@@ -1082,7 +1095,7 @@ const getOfflineData = async (req, res) => {
       description: document.description,
       created_at: document.created_at,
       file_size: document.file_size,
-      content: 'Document disponible pour consultation hors ligne'
+      content: 'Document disponible pour consultation hors ligne (staff uniquement)'
     };
 
     res.json({
@@ -1095,6 +1108,229 @@ const getOfflineData = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Erreur lors de la récupération des données hors ligne'
+    });
+  }
+};
+
+/**
+ * 🔐 VÉRIFIER L'ACCÈS EN TEMPS RÉEL (ANTI-OFFLINE)
+ * POST /api/documents/:id/verify-access
+ */
+const verifyDocumentAccess = async (req, res) => {
+  try {
+    const { role, id: userId } = req.user;
+    const documentId = parseInt(req.params.id);
+    const { session_token, timestamp } = req.body;
+
+    // Seuls les patients ont besoin de vérification de session
+    if (role !== 'patient') {
+      return res.json({
+        success: true,
+        message: 'Vérification non nécessaire pour ce rôle',
+        access_granted: true
+      });
+    }
+
+    // Vérifier le document
+    const document = await prisma.document.findUnique({
+      where: { id: documentId },
+      include: {
+        patient: { include: { user: true } }
+      }
+    });
+
+    if (!document || document.patient.user_id !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Document non accessible',
+        access_granted: false
+      });
+    }
+
+    // Vérifier la connexion récente (moins de 5 minutes)
+    const recentAccess = await prisma.documentAccess.findFirst({
+      where: {
+        document_id: documentId,
+        user_id: userId,
+        created_at: { gt: new Date(Date.now() - 5 * 60 * 1000) }
+      },
+      orderBy: { created_at: 'desc' }
+    });
+
+    // Si pas d'accès récent, créer un nouvel enregistrement d'accès (première fois ou après expiration)
+    if (!recentAccess) {
+      // Créer un nouvel enregistrement d'accès
+      await prisma.documentAccess.create({
+        data: {
+          document_id: documentId,
+          user_id: userId,
+          access_type: 'view',
+          ip_address: req.ip,
+          user_agent: req.get('User-Agent') || 'Unknown',
+          is_offline_attempt: false
+        }
+      });
+
+      console.log(`✅ Nouvel accès accordé pour document ${documentId} par utilisateur ${userId}`);
+      
+      return res.json({
+        success: true,
+        message: 'Accès accordé et enregistré',
+        access_granted: true,
+        session_valid: true,
+        expires_in: 300, // 5 minutes
+        is_new_session: true
+      });
+    }
+
+    // Si accès récent trouvé, enregistrer la vérification
+    await prisma.documentAccess.create({
+      data: {
+        document_id: documentId,
+        user_id: userId,
+        access_type: 'verify',
+        ip_address: req.ip,
+        user_agent: req.get('User-Agent') || 'Unknown',
+        is_offline_attempt: false
+      }
+    }).catch(console.error);
+
+    const timeRemaining = Math.max(0, 300 - Math.floor((Date.now() - recentAccess.created_at.getTime()) / 1000));
+
+    res.json({
+      success: true,
+      message: 'Accès vérifié - session active',
+      access_granted: true,
+      session_valid: true,
+      expires_in: timeRemaining,
+      is_new_session: false
+    });
+
+  } catch (error) {
+    console.error('Erreur vérification accès:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur de vérification',
+      access_granted: false
+    });
+  }
+};
+
+/**
+ * 📱 TÉLÉCHARGEMENT SÉCURISÉ POUR STOCKAGE OFFLINE CHIFFRÉ (PATIENTS)
+ * GET /api/documents/:id/secure-download
+ */
+const secureDownloadForOffline = async (req, res) => {
+  try {
+    const { role, id: userId, hospital_id, laboratory_id } = req.user;
+    const documentId = parseInt(req.params.id);
+
+    // Récupérer le document avec ses relations
+    const document = await prisma.document.findUnique({
+      where: { id: documentId },
+      include: {
+        patient: {
+          include: { user: true }
+        }
+      }
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document non trouvé'
+      });
+    }
+
+    // Vérifications de permissions
+    let canAccess = false;
+
+    if (role === 'patient') {
+      // Un patient ne peut télécharger que ses propres documents
+      if (document.patient.user_id === userId) {
+        canAccess = true;
+      }
+    } else if (role === 'hospital_staff' || role === 'hospital_admin') {
+      // Staff hospitalier ne peut voir que les documents de son hôpital
+      if (document.hospital_id === hospital_id) {
+        canAccess = true;
+      }
+    } else if (role === 'lab_staff' || role === 'lab_admin') {
+      // Staff laboratoire ne peut voir que les documents de son laboratoire
+      if (document.laboratory_id === laboratory_id) {
+        canAccess = true;
+      }
+    } else if (role === 'super_admin') {
+      canAccess = true;
+    }
+
+    if (!canAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Accès non autorisé à ce document'
+      });
+    }
+
+    // Vérifier que le fichier existe
+    try {
+      await fs.access(document.file_path);
+    } catch (error) {
+      return res.status(404).json({
+        success: false,
+        message: 'Fichier non trouvé sur le serveur'
+      });
+    }
+
+    // Enregistrer l'accès pour audit
+    await prisma.documentAccess.create({
+      data: {
+        document_id: documentId,
+        user_id: userId,
+        access_type: 'secure_download',
+        ip_address: req.ip,
+        user_agent: req.get('User-Agent') || 'Unknown',
+        is_offline_attempt: false
+      }
+    }).catch(console.error);
+
+    // Headers pour téléchargement sécurisé
+    const mimeType = getMimeType(document.filename);
+    res.setHeader('Content-Type', 'application/octet-stream'); // Force binary download
+    res.setHeader('Content-Length', document.file_size);
+    res.setHeader('Content-Disposition', `attachment; filename="encrypted_${document.filename}"`);
+    
+    // Headers de sécurité
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Download-Options', 'noopen');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    
+    // Informations pour l'app (dans des headers personnalisés)
+    res.setHeader('X-Document-Id', documentId.toString());
+    res.setHeader('X-Document-Type', document.document_type);
+    res.setHeader('X-Original-Filename', document.filename);
+    res.setHeader('X-Secure-Download', 'true');
+
+    // Stream sécurisé du fichier
+    const fileStream = require('fs').createReadStream(document.file_path);
+    fileStream.pipe(res);
+
+    fileStream.on('error', (error) => {
+      console.error('Erreur streaming fichier pour téléchargement sécurisé:', error);
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          message: 'Erreur lors de la lecture du fichier'
+        });
+      }
+    });
+
+  } catch (error) {
+    console.error('Erreur téléchargement sécurisé:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur interne du serveur'
     });
   }
 };
@@ -1239,5 +1475,7 @@ module.exports = {
   transferDocument,
   getTransferRecipients,
   getOfflineData,
+  verifyDocumentAccess,
+  secureDownloadForOffline,
   deleteDocument
 };

@@ -4,6 +4,7 @@
 
 const { PrismaClient } = require('@prisma/client');
 const { notifyNewMessage } = require('../services/notificationService');
+const { sendRealtimeMessage } = require('../services/websocketService');
 
 const prisma = new PrismaClient();
 
@@ -34,8 +35,7 @@ const getConversations = async (req, res) => {
     // Recherche par titre de conversation
     if (search) {
       whereClause.title = {
-        contains: search,
-        mode: 'insensitive'
+        contains: search
       };
     }
 
@@ -150,7 +150,7 @@ const getConversations = async (req, res) => {
  */
 const createConversation = async (req, res) => {
   try {
-    const { id: userId, role: userRole } = req.user;
+    const { id: userId } = req.user;
     const { participant_ids, title, initial_message } = req.body;
 
     // Validation des données
@@ -168,7 +168,7 @@ const createConversation = async (req, res) => {
       });
     }
 
-    // Vérifier que les participants existent et sont accessibles
+    // Vérifier que les participants existent
     const participants = await prisma.user.findMany({
       where: {
         id: { in: participant_ids },
@@ -191,44 +191,12 @@ const createConversation = async (req, res) => {
       });
     }
 
-    // Vérifications de permissions selon le rôle
-    const currentUser = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { hospital_id: true, laboratory_id: true, role: true }
-    });
-
-    // Patients ne peuvent contacter que le staff de leur établissement
-    if (userRole === 'patient') {
-      const invalidParticipants = participants.filter(p => {
-        if (p.role === 'super_admin') return false; // Super admin accessible à tous
-        if (currentUser.hospital_id && p.hospital_id === currentUser.hospital_id) return false;
-        if (currentUser.laboratory_id && p.laboratory_id === currentUser.laboratory_id) return false;
-        return true;
+    // Vérifier les restrictions de communication selon les rôles
+    if (!(await checkCommunicationPermissions(req.user, participant_ids))) {
+      return res.status(403).json({
+        success: false,
+        message: 'Vous n\'êtes pas autorisé à communiquer avec ces utilisateurs'
       });
-
-      if (invalidParticipants.length > 0) {
-        return res.status(403).json({
-          success: false,
-          message: 'Vous ne pouvez contacter que le personnel de votre établissement'
-        });
-      }
-    }
-
-    // Staff ne peut contacter que les utilisateurs de son établissement (sauf super admin)
-    if (['hospital_staff', 'lab_staff'].includes(userRole)) {
-      const invalidParticipants = participants.filter(p => {
-        if (p.role === 'super_admin') return false; // Super admin accessible à tous
-        if (userRole === 'hospital_staff' && p.hospital_id === currentUser.hospital_id) return false;
-        if (userRole === 'lab_staff' && p.laboratory_id === currentUser.laboratory_id) return false;
-        return true;
-      });
-
-      if (invalidParticipants.length > 0) {
-        return res.status(403).json({
-          success: false,
-          message: 'Vous ne pouvez contacter que les utilisateurs de votre établissement'
-        });
-      }
     }
 
     // Générer un titre automatique si non fourni
@@ -298,6 +266,23 @@ const createConversation = async (req, res) => {
         }
       }
     });
+
+    // Notifier les participants de la nouvelle conversation via WebSocket
+    try {
+      const { sendRealtimeNotificationToUsers } = require('../services/websocketService');
+      const notificationData = {
+        id: 0,
+        type: 'new_conversation',
+        title: 'Nouvelle conversation',
+        message: `${req.user.first_name || 'Un utilisateur'} vous a ajouté à une nouvelle conversation : ${conversationTitle}`,
+        data: { conversationId: result.conversation.id, conversationTitle },
+        is_read: false,
+        created_at: new Date().toISOString()
+      };
+      sendRealtimeNotificationToUsers(participant_ids, notificationData);
+    } catch (error) {
+      console.error('Erreur notification nouvelle conversation:', error);
+    }
 
     res.status(201).json({
       success: true,
@@ -462,6 +447,14 @@ const sendMessage = async (req, res) => {
     } catch (notificationError) {
       console.error('Erreur création notification message:', notificationError);
       // Ne pas faire échouer l'envoi du message si la notification échoue
+    }
+
+    // Envoyer le message en temps réel via WebSocket
+    try {
+      sendRealtimeMessage(conversationId, message, userId);
+    } catch (websocketError) {
+      console.error('Erreur envoi message temps réel:', websocketError);
+      // Ne pas faire échouer l'envoi si le WebSocket échoue
     }
 
     res.status(201).json({
@@ -736,7 +729,7 @@ const leaveConversation = async (req, res) => {
  */
 const searchContacts = async (req, res) => {
   try {
-    const { id: userId, role: userRole, hospital_id, laboratory_id } = req.user;
+    const { id: userId } = req.user;
     const { search, role: roleFilter, page = 1, limit = 20 } = req.query;
 
     if (!search || search.trim().length < 2) {
@@ -749,76 +742,16 @@ const searchContacts = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const take = parseInt(limit);
 
-    let whereClause = {
-      id: { not: userId }, // Exclure l'utilisateur actuel
+    const whereClause = {
+      id: { not: userId },
       is_active: true,
       OR: [
-        { first_name: { contains: search.trim(), mode: 'insensitive' } },
-        { last_name: { contains: search.trim(), mode: 'insensitive' } },
-        { email: { contains: search.trim(), mode: 'insensitive' } }
+        { first_name: { contains: search.trim() } },
+        { last_name: { contains: search.trim() } },
+        { email: { contains: search.trim() } }
       ]
     };
 
-    // Filtres de permissions selon le rôle
-    if (userRole === 'patient') {
-      // Patients peuvent contacter le staff de leur établissement + super admins
-      whereClause.OR = [
-        { role: 'super_admin' },
-        { hospital_id: hospital_id, role: { in: ['hospital_staff', 'hospital_admin'] } },
-        { laboratory_id: laboratory_id, role: { in: ['lab_staff', 'lab_admin'] } }
-      ].filter(condition => {
-        // Filtrer les conditions nulles
-        if (condition.hospital_id === null || condition.laboratory_id === null) {
-          return false;
-        }
-        return true;
-      });
-
-      // Ajouter la condition de recherche textuelle
-      whereClause.AND = [
-        {
-          OR: [
-            { first_name: { contains: search.trim(), mode: 'insensitive' } },
-            { last_name: { contains: search.trim(), mode: 'insensitive' } },
-            { email: { contains: search.trim(), mode: 'insensitive' } }
-          ]
-        }
-      ];
-      delete whereClause.OR; // Supprimer l'ancienne condition OR
-    } else if (['hospital_staff', 'hospital_admin'].includes(userRole)) {
-      // Staff hospitalier peut contacter les utilisateurs de son hôpital + super admins
-      whereClause.OR = [
-        { role: 'super_admin' },
-        { hospital_id: hospital_id }
-      ];
-      whereClause.AND = [
-        {
-          OR: [
-            { first_name: { contains: search.trim(), mode: 'insensitive' } },
-            { last_name: { contains: search.trim(), mode: 'insensitive' } },
-            { email: { contains: search.trim(), mode: 'insensitive' } }
-          ]
-        }
-      ];
-    } else if (['lab_staff', 'lab_admin'].includes(userRole)) {
-      // Staff laboratoire peut contacter les utilisateurs de son laboratoire + super admins
-      whereClause.OR = [
-        { role: 'super_admin' },
-        { laboratory_id: laboratory_id }
-      ];
-      whereClause.AND = [
-        {
-          OR: [
-            { first_name: { contains: search.trim(), mode: 'insensitive' } },
-            { last_name: { contains: search.trim(), mode: 'insensitive' } },
-            { email: { contains: search.trim(), mode: 'insensitive' } }
-          ]
-        }
-      ];
-    }
-    // Super admin peut contacter tout le monde (pas de restriction)
-
-    // Filtre par rôle si spécifié
     if (roleFilter) {
       whereClause.role = roleFilter;
     }
@@ -892,4 +825,83 @@ module.exports = {
   addParticipant,
   leaveConversation,
   searchContacts
+};
+
+/**
+ * Vérifier les permissions de communication entre utilisateurs
+ */
+const checkCommunicationPermissions = async (user, targetParticipantIds) => {
+  // Le super admin peut communiquer avec tout le monde
+  if (user.role === 'super_admin') {
+    return true;
+  }
+  
+  // Récupérer les utilisateurs cibles
+  const targetUsers = await prisma.user.findMany({
+    where: { id: { in: targetParticipantIds }, is_active: true }
+  });
+
+  // Vérifier les règles de communication selon le rôle de l'utilisateur
+  switch (user.role) {
+    case 'patient':
+      // Un patient peut communiquer avec :
+      // - d'autres patients
+      // - des médecins (hospital_staff)
+      // - des laborantins (lab_staff)
+      // - le super admin
+      return targetUsers.every(u => 
+        u.role === 'patient' || 
+        u.role === 'hospital_staff' || 
+        u.role === 'lab_staff' || 
+        u.role === 'super_admin'
+      );
+    
+    case 'hospital_staff':
+    case 'lab_staff':
+      // Les médecins et laborantins peuvent communiquer avec :
+      // - des utilisateurs du même hôpital ou laboratoire
+      // - des médecins et laborantins d'autres établissements
+      // - des admins de leur établissement
+      // - le super admin
+      const userEstablishment = user.hospital_id || user.laboratory_id;
+      return targetUsers.every(u => {
+        const targetEstablishment = u.hospital_id || u.laboratory_id;
+        
+        return (
+          // Même utilisateur
+          u.id === user.id ||
+          // Même établissement
+          targetEstablishment === userEstablishment ||
+          // Médecin ou laborantin d'autres établissements
+          (u.role === 'hospital_staff' || u.role === 'lab_staff') ||
+          // Admins de l'établissement
+          (u.role === 'hospital_admin' && u.hospital_id === user.hospital_id) ||
+          (u.role === 'lab_admin' && u.laboratory_id === user.laboratory_id) ||
+          // Super admin
+          u.role === 'super_admin'
+        );
+      });
+    
+    case 'hospital_admin':
+    case 'lab_admin':
+      // Les admins d'hôpital ou de laboratoire peuvent communiquer avec :
+      // - tous les utilisateurs de leur établissement
+      // - le super admin
+      const adminEstablishmentId = user.hospital_id || user.laboratory_id;
+      return targetUsers.every(u => {
+        const targetEstablishmentId = u.hospital_id || u.laboratory_id;
+        
+        return (
+          // Même utilisateur
+          u.id === user.id ||
+          // Utilisateurs de leur établissement
+          (u.hospital_id === user.hospital_id || u.laboratory_id === user.laboratory_id) ||
+          // Super admin
+          u.role === 'super_admin'
+        );
+      });
+    
+    default:
+      return false;
+  }
 };

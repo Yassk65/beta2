@@ -161,6 +161,37 @@ const getConversationParticipants = async (conversationId) => {
   }
 };
 
+/**
+ * Envoyer une notification push (simulation)
+ */
+const sendPushNotification = async (userId, notification) => {
+  try {
+    const settings = await prisma.notificationSettings.findUnique({
+      where: { user_id: userId }
+    });
+
+    if (!settings || !settings.push_enabled) {
+      return false;
+    }
+
+    // Simulation d'envoi de notification push
+    console.log(`\uD83D\uDCF1 Push notification to user ${userId}: ${notification.title}`);
+
+    await prisma.notification.update({
+      where: { id: notification.id },
+      data: {
+        is_sent: true,
+        sent_at: new Date()
+      }
+    });
+
+    return true;
+  } catch (error) {
+    console.error('Erreur envoi push notification:', error);
+    return false;
+  }
+};
+
 // ============================================================================
 // FONCTIONS DE CRÉATION DE NOTIFICATIONS
 // ============================================================================
@@ -188,6 +219,17 @@ const createNotification = async (userId, type, title, message, data = null, rel
         related_exam_id: relatedIds.examId || null
       }
     });
+    // Tentative d'envoi push
+    await sendPushNotification(userId, notification);
+
+    // 🔔 Envoi en temps réel via WebSocket
+    try {
+      const { sendRealtimeNotification } = require('./websocketService');
+      sendRealtimeNotification(userId, notification);
+    } catch (error) {
+      // WebSocket service pas encore initialisé, ce n'est pas grave
+      console.log('WebSocket service non disponible pour la notification temps réel');
+    }
 
     return notification;
   } catch (error) {
@@ -534,5 +576,6 @@ module.exports = {
   // Fonctions utilitaires
   isNotificationEnabled,
   getDocumentAccessUsers,
-  getConversationParticipants
+  getConversationParticipants,
+  sendPushNotification
 };

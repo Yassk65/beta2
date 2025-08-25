@@ -7,9 +7,13 @@ const { body, validationResult } = require('express-validator');
 const { 
   login, 
   register, 
-  getProfile, 
+  getProfile,
+  updateProfile,
+  changePassword,
   refreshToken, 
-  logout 
+  logout,
+  deleteAccount,
+  requestDataExport
 } = require('../controllers/authController');
 const { authenticateToken } = require('../middleware/auth');
 
@@ -51,7 +55,6 @@ const registerValidation = [
     .withMessage('Le nom doit contenir entre 2 et 50 caractères')
     .matches(/^[a-zA-ZÀ-ÿ\s-']+$/)
     .withMessage('Le nom ne peut contenir que des lettres, espaces, tirets et apostrophes'),
-  
   body('date_of_birth')
     .optional()
     .isISO8601()
@@ -70,6 +73,50 @@ const registerValidation = [
     .optional()
     .isIn(['M', 'F', 'Other'])
     .withMessage('Genre invalide (M, F, ou Other)')
+];
+
+const updateProfileValidation = [
+  body('first_name')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Le prénom doit contenir entre 2 et 50 caractères')
+    .matches(/^[a-zA-ZÀ-ÿ\s-']+$/)
+    .withMessage('Le prénom ne peut contenir que des lettres, espaces, tirets et apostrophes'),
+  body('last_name')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage('Le nom doit contenir entre 2 et 50 caractères')
+    .matches(/^[a-zA-ZÀ-ÿ\s-']+$/)
+    .withMessage('Le nom ne peut contenir que des lettres, espaces, tirets et apostrophes'),
+  body('email')
+    .optional()
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Email valide requis'),
+  body('phone')
+    .optional()
+    .trim()
+    .isLength({ min: 6, max: 20 })
+    .withMessage('Le numéro de téléphone doit contenir entre 6 et 20 caractères')
+    .matches(/^[+]?[0-9\s\-().]+$/)
+    .withMessage('Le numéro de téléphone ne peut contenir que des chiffres, espaces, tirets, parenthèses et le signe +'),
+  body('date_of_birth')
+    .optional()
+    .isISO8601()
+    .withMessage('Date de naissance invalide (format YYYY-MM-DD)')
+];
+
+const changePasswordValidation = [
+  body('currentPassword')
+    .isLength({ min: 1 })
+    .withMessage('Mot de passe actuel requis'),
+  body('newPassword')
+    .isLength({ min: 6 })
+    .withMessage('Le nouveau mot de passe doit contenir au moins 6 caractères')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+    .withMessage('Le nouveau mot de passe doit contenir au moins une minuscule, une majuscule et un chiffre')
 ];
 
 // ============================================================================
@@ -177,6 +224,60 @@ router.post('/logout',
   logout
 );
 
+/**
+ * ✏️ METTRE À JOUR LE PROFIL
+ * PUT /api/auth/profile
+ * 
+ * Headers: Authorization: Bearer <token>
+ * Body: { first_name?, last_name?, email?, phone?, date_of_birth?, address? }
+ * Response: { success, message, data: { user } }
+ */
+router.put('/profile',
+  authenticateToken,
+  updateProfileValidation,
+  handleValidationErrors,
+  updateProfile
+);
+
+/**
+ * 🔒 CHANGER LE MOT DE PASSE
+ * PUT /api/auth/change-password
+ * 
+ * Headers: Authorization: Bearer <token>
+ * Body: { currentPassword, newPassword }
+ * Response: { success, message }
+ */
+router.put('/change-password',
+  authenticateToken,
+  changePasswordValidation,
+  handleValidationErrors,
+  changePassword
+);
+
+/**
+ * 🗑️ SUPPRIMER LE COMPTE
+ * DELETE /api/auth/account
+ * 
+ * Headers: Authorization: Bearer <token>
+ * Response: { success, message }
+ */
+router.delete('/account',
+  authenticateToken,
+  deleteAccount
+);
+
+/**
+ * 📄 DEMANDER UN EXPORT DES DONNÉES
+ * POST /api/auth/data-export
+ * 
+ * Headers: Authorization: Bearer <token>
+ * Response: { success, message, data: { user, exportDate, disclaimer } }
+ */
+router.post('/data-export',
+  authenticateToken,
+  requestDataExport
+);
+
 // ============================================================================
 // ROUTE DE TEST
 // ============================================================================
@@ -219,8 +320,13 @@ router.use((req, res) => {
       'POST /api/auth/login',
       'POST /api/auth/register',
       'GET /api/auth/profile',
+      'PUT /api/auth/profile',
+      'GET /api/auth/patient-profile',
+      'PUT /api/auth/change-password',
       'POST /api/auth/refresh',
       'POST /api/auth/logout',
+      'DELETE /api/auth/account',
+      'POST /api/auth/data-export',
       'GET /api/auth/test'
     ]
   });

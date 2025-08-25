@@ -103,7 +103,7 @@ class OpenRouterService {
    * Construit le prompt système médical avec contexte
    */
   buildMedicalSystemPrompt(medicalContext) {
-    const basePrompt = `Tu es un assistant médical IA spécialisé dans l'aide aux patients. 
+    let basePrompt = `Tu es un assistant médical IA spécialisé dans l'aide aux patients. 
 
 RÈGLES IMPORTANTES :
 1. Tu n'es PAS un médecin et ne peux pas remplacer une consultation médicale
@@ -229,6 +229,131 @@ Votre santé est importante, n'hésitez pas à consulter un professionnel de san
       // Titre par défaut en cas d'erreur
       return `Consultation du ${new Date().toLocaleDateString('fr-FR')}`;
     }
+  }
+
+  /**
+   * Analyse un document médical et génère un résumé ou une explication
+   * @param {string} documentText - Contenu extrait du document
+   * @param {string} documentType - Type de document (prescription, analyse, etc.)
+   * @param {string} analysisType - Type d'analyse ('summary' ou 'explanation')
+   * @param {Object} patientContext - Contexte du patient (âge, genre, etc.)
+   * @returns {Object} Réponse avec l'analyse du document
+   */
+  async analyzeDocument(documentText, documentType, analysisType = 'summary', patientContext = {}) {
+    try {
+      const startTime = Date.now();
+      
+      let prompt;
+      if (analysisType === 'summary') {
+        prompt = `Tu es un assistant médical expert. Génère un résumé concis et compréhensible de ce document médical de type "${documentType}" pour un patient. Utilise un langage simple et accessible.
+
+Document à analyser :
+${documentText}
+
+Fournis un résumé structuré avec :
+1. **Résumé principal** (2-3 phrases)
+2. **Résultats clés** (points importants)
+3. **Recommandations** (si mentionnées)
+4. **Prochaines étapes** (si applicables)
+
+Reste factuel et ne donne pas de conseils médicaux spécifiques.`;
+      } else {
+        prompt = `Tu es un assistant médical expert. Explique ce document médical de type "${documentType}" de manière détaillée et compréhensible pour un patient. Utilise un langage accessible, évite le jargon médical complexe.
+
+Document à analyser :
+${documentText}
+
+Fournis une explication complète avec :
+1. **Contexte** - De quoi parle ce document
+2. **Résultats détaillés** - Explication des valeurs et mesures
+3. **Signification clinique** - Ce que cela signifie pour la santé
+4. **Questions à poser** - Questions utiles pour le médecin
+
+Reste factuel et ne donne pas de conseils médicaux spécifiques.`;
+      }
+
+      const response = await axios.post(
+        `${this.baseURL}/chat/completions`,
+        {
+          model: this.defaultModel,
+          messages: [
+            {
+              role: 'system',
+              content: 'Tu es un assistant médical expert qui aide les patients à comprendre leurs documents médicaux. Réponds toujours en français et inclus toujours un disclaimer médical.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          max_tokens: analysisType === 'summary' ? 800 : 1500,
+          temperature: 0.3 // Température basse pour la précision médicale
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'http://localhost:3000',
+            'X-Title': 'Assistant Médical MVP'
+          },
+          timeout: 30000
+        }
+      );
+
+      const endTime = Date.now();
+      const responseTime = endTime - startTime;
+      const aiResponse = response.data.choices[0]?.message?.content;
+      const tokensUsed = response.data.usage?.total_tokens || 0;
+
+      if (!aiResponse) {
+        throw new Error('Réponse vide de l\'API');
+      }
+
+      return {
+        success: true,
+        content: aiResponse,
+        metadata: {
+          model: this.defaultModel,
+          tokensUsed: tokensUsed,
+          responseTime: responseTime,
+          analysisType: analysisType
+        }
+      };
+
+    } catch (error) {
+      console.error('Erreur analyse document OpenRouter:', error.response?.data || error.message);
+      
+      return {
+        success: false,
+        content: this.getDocumentAnalysisFallback(documentType, analysisType),
+        error: error.message,
+        metadata: {
+          model: 'fallback',
+          tokensUsed: 0,
+          responseTime: 0,
+          analysisType: analysisType
+        }
+      };
+    }
+  }
+
+  /**
+   * Réponse de fallback pour l'analyse de documents
+   */
+  getDocumentAnalysisFallback(documentType, analysisType) {
+    const analysisWord = analysisType === 'summary' ? 'résumé' : 'explication';
+    
+    return `Je suis désolé, je ne peux pas générer de ${analysisWord} pour ce document de type "${documentType}" en raison de difficultés techniques temporaires.
+
+**Recommandations importantes :**
+- Consultez votre médecin traitant pour l'interprétation de ce document
+- Apportez le document original lors de votre prochaine consultation
+- N'hésitez pas à poser des questions à votre professionnel de santé
+- En cas d'urgence ou de préoccupation, contactez immédiatement votre médecin
+
+**Service d'urgence :** En cas d'urgence médicale, appelez le 15 (SAMU)
+
+⚠️ **Disclaimer médical :** Cet assistant ne remplace en aucun cas une consultation médicale professionnelle. Seul un professionnel de santé qualifié peut interpréter et expliquer vos documents médicaux de manière appropriée.`;
   }
 
   /**

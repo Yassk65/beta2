@@ -3,6 +3,8 @@
 // 🎯 Architecture unifiée pour l'application de santé
 
 const express = require('express');
+const http = require('http');
+const socketIo = require('socket.io');
 const cors = require('cors');
 const helmet = require('helmet');
 // const rateLimit = require('express-rate-limit'); // Désactivé pour les tests
@@ -22,7 +24,22 @@ const medicalChatRoutes = require('./routes/medicalChat');
 const establishmentsRoutes = require('./routes/establishments');
 
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: [
+      'http://localhost:8100',
+      'http://localhost:4200',
+      process.env.FRONTEND_URL
+    ].filter(Boolean),
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
 const prisma = new PrismaClient();
+
+// Rendre io accessible globalement
+global.io = io;
 
 // ============================================================================
 // MIDDLEWARE DE SÉCURITÉ
@@ -50,7 +67,15 @@ app.use(cors({
   ].filter(Boolean),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization',
+    'Cache-Control',
+    'Pragma',
+    'Expires',
+    'If-Modified-Since',
+    'If-None-Match'
+  ]
 }));
 
 // Rate limiting désactivé pour les tests
@@ -128,6 +153,14 @@ app.use('/api/establishments', establishmentsRoutes);
 
 // Import du service de géocodage
 const geocodingService = require('./services/geocodingService');
+
+// ============================================================================
+// CONFIGURATION WEBSOCKET
+// ============================================================================
+
+// Import et configuration du gestionnaire WebSocket
+const { setupWebSocketHandlers } = require('./services/websocketService');
+setupWebSocketHandlers(io);
 
 // ============================================================================
 // GESTION DES ERREURS
@@ -223,12 +256,13 @@ async function startServer() {
     const userCount = await prisma.user.count();
     console.log(`📊 ${userCount} utilisateurs dans la base de données`);
 
-    // Démarrage du serveur
-    app.listen(PORT, () => {
+    // Démarrage du serveur avec Socket.IO
+    server.listen(PORT, () => {
       console.log('🚀 ================================');
       console.log('🏥 API MVP SANTÉ DÉMARRÉE');
       console.log('🚀 ================================');
       console.log(`📡 Serveur: http://localhost:${PORT}`);
+      console.log(`🔌 WebSocket: ws://localhost:${PORT}`);
       console.log(`🌍 Environnement: ${process.env.NODE_ENV || 'development'}`);
       console.log(`📊 Base de données: ${userCount} utilisateurs`);
       console.log(`⏰ Démarré le: ${new Date().toLocaleString('fr-FR')}`);

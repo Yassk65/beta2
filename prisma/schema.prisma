@@ -1,8 +1,3 @@
-// Schéma Prisma MVP ULTRA-SIMPLIFIÉ - VERSION CORRIGÉE
-// 📅 Créé le : 11 Août 2025
-// 🎯 Objectif : MVP réaliste avec données essentielles uniquement
-// 🔧 Fix : Tailles VARCHAR compatibles MySQL (191 max pour index)
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -12,46 +7,36 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============================================================================
-// TABLE UTILISATEURS UNIFIÉE - VERSION MVP CORRIGÉE
-// ============================================================================
-
 model User {
   id            Int       @id @default(autoincrement())
-  email         String    @unique @db.VarChar(191)  // 191 pour compatibilité MySQL
+  email         String    @unique
   password_hash String    @db.VarChar(255)
   first_name    String?   @db.VarChar(100)
   last_name     String?   @db.VarChar(100)
   phone         String?   @db.VarChar(20)
-  
-  // Rôle simplifié
   role          UserRole  @default(patient)
-  
-  // Références vers établissements (NULL pour patients et super_admin)
   hospital_id   Int?
   laboratory_id Int?
-  
-  // Statut de base
   is_active     Boolean   @default(true)
   last_seen     DateTime?
-  
-  // Métadonnées
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
-  
-  // Relations essentielles
+
+  // Relations
   hospital                  Hospital?   @relation(fields: [hospital_id], references: [id], onDelete: SetNull)
   laboratory                Laboratory? @relation(fields: [laboratory_id], references: [id], onDelete: SetNull)
   patient                   Patient?
   uploaded_documents        Document[]  @relation("DocumentUploader")
   document_access_logs      DocumentAccess[] @relation("DocumentAccess")
-  conversation_participants ConversationParticipant[]
+  document_access_history   DocumentAccessLogs[] @relation("DocumentAccessLogs")
+  document_sessions         DocumentSessions[] @relation("DocumentSessions")
   messages_sent             Message[]
+  conversation_participants ConversationParticipant[]
   requested_exams           ExamRequest[] @relation("ExamRequester")
   processed_exams           ExamRequest[] @relation("ExamProcessor")
   notifications             Notification[]
   notification_settings     NotificationSettings?
-  
+
   @@index([email])
   @@index([role])
   @@index([hospital_id])
@@ -59,109 +44,83 @@ model User {
   @@map("users")
 }
 
-// ============================================================================
-// PROFIL PATIENT MINIMAL
-// ============================================================================
-
 model Patient {
-  id              Int      @id @default(autoincrement())
-  user_id         Int      @unique
-  date_of_birth   DateTime?
-  gender          Gender?
-  phone           String?  @db.VarChar(20)
-  
+  id            Int       @id @default(autoincrement())
+  user_id       Int       @unique
+  date_of_birth DateTime?
+  gender        Gender?
+  phone         String?   @db.VarChar(20)
+
   // Relations
-  user            User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  documents       Document[]
-  exam_requests   ExamRequest[]
+  user          User      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  documents     Document[]
+  exam_requests ExamRequest[]
   medical_chat_sessions MedicalChatSession[]
-  
+
   @@map("patients")
 }
 
-// ============================================================================
-// ÉTABLISSEMENTS SIMPLIFIÉS
-// ============================================================================
-
 model Hospital {
-  id          Int      @id @default(autoincrement())
-  name        String   @db.VarChar(191)  // 191 pour compatibilité
-  address     String   @db.Text
-  city        String   @db.VarChar(100)
-  phone       String?  @db.VarChar(20)
-  email       String?  @db.VarChar(191)  // 191 pour compatibilité
-  
-  // Géolocalisation basique
-  latitude    Float?
-  longitude   Float?
-  
-  // Statut
-  is_active   Boolean  @default(true)
-  created_at  DateTime @default(now())
-  
+  id         Int      @id @default(autoincrement())
+  name       String
+  address    String   @db.Text
+  city       String   @db.VarChar(100)
+  phone      String?  @db.VarChar(20)
+  email      String?
+  latitude   Float?
+  longitude  Float?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
   // Relations
   users         User[]
   documents     Document[]
   exam_requests ExamRequest[] @relation("HospitalExamRequests")
-  
+
   @@index([city])
   @@index([is_active])
   @@map("hospitals")
 }
 
 model Laboratory {
-  id          Int      @id @default(autoincrement())
-  name        String   @db.VarChar(191)  // 191 pour compatibilité
-  address     String   @db.Text
-  city        String   @db.VarChar(100)
-  phone       String?  @db.VarChar(20)
-  email       String?  @db.VarChar(191)  // 191 pour compatibilité
-  
-  // Géolocalisation basique
-  latitude    Float?
-  longitude   Float?
-  
-  // Statut
-  is_active   Boolean  @default(true)
-  created_at  DateTime @default(now())
-  
+  id         Int      @id @default(autoincrement())
+  name       String
+  address    String   @db.Text
+  city       String   @db.VarChar(100)
+  phone      String?  @db.VarChar(20)
+  email      String?
+  latitude   Float?
+  longitude  Float?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+
   // Relations
   users         User[]
   documents     Document[]
   exam_requests ExamRequest[] @relation("LaboratoryExamRequests")
-  
+
   @@index([city])
   @@index([is_active])
   @@map("laboratories")
 }
 
-// ============================================================================
-// DOCUMENTS MÉDICAUX BASIQUES
-// ============================================================================
-
 model Document {
-  id                Int         @id @default(autoincrement())
-  patient_id        Int
-  uploaded_by       Int
-  hospital_id       Int?
-  laboratory_id     Int?
-  
-  // Fichier
-  filename          String      @db.VarChar(191)  // 191 pour compatibilité
-  file_path         String      @db.VarChar(500)
-  file_size         Int
-  secure_filename   String?     @db.VarChar(191)  // Nom chiffré pour sécurité
-  secure_token      String?     @db.VarChar(191)  // Token d'accès sécurisé
-  
-  // Type de document
-  document_type     DocumentType @default(other)
-  description       String?     @db.Text
-  shared_with       String?     @db.Text  // JSON des IDs utilisateurs autorisés
-  
-  // Métadonnées
-  created_at        DateTime    @default(now())
-  updated_at        DateTime    @updatedAt
-  
+  id              Int          @id @default(autoincrement())
+  patient_id      Int
+  uploaded_by     Int
+  hospital_id     Int?
+  laboratory_id   Int?
+  filename        String
+  file_path       String       @db.VarChar(500)
+  file_size       Int
+  secure_filename String?
+  secure_token    String?
+  document_type   DocumentType @default(other)
+  description     String?      @db.Text
+  shared_with     String?      @db.Text
+  created_at      DateTime     @default(now())
+  updated_at      DateTime     @updatedAt
+
   // Relations
   patient           Patient     @relation(fields: [patient_id], references: [id], onDelete: Cascade)
   uploader          User        @relation("DocumentUploader", fields: [uploaded_by], references: [id], onDelete: Restrict)
@@ -169,80 +128,112 @@ model Document {
   laboratory        Laboratory? @relation(fields: [laboratory_id], references: [id], onDelete: SetNull)
   ai_explanation    DocumentAIExplanation?
   access_logs       DocumentAccess[]
-  
+  access_history    DocumentAccessLogs[] @relation("DocumentAccessLogs")
+  sessions          DocumentSessions[]
+
   @@index([patient_id])
   @@index([document_type])
   @@index([secure_token])
+  @@index([hospital_id], map: "documents_hospital_id_fkey")
+  @@index([laboratory_id], map: "documents_laboratory_id_fkey")
+  @@index([uploaded_by], map: "documents_uploaded_by_fkey")
   @@map("documents")
 }
 
-// ============================================================================
-// NOUVELLES TABLES POUR FONCTIONNALITÉS AVANCÉES
-// ============================================================================
-
 model DocumentAIExplanation {
-  id            Int      @id @default(autoincrement())
-  document_id   Int      @unique
-  explanation   String   @db.Text
-  generated_at  DateTime @default(now())
-  
+  id           Int      @id @default(autoincrement())
+  document_id  Int      @unique
+  explanation  String   @db.Text
+  generated_at DateTime @default(now())
+
   // Relations
-  document      Document @relation(fields: [document_id], references: [id], onDelete: Cascade)
-  
+  document     Document @relation(fields: [document_id], references: [id], onDelete: Cascade)
+
   @@map("document_ai_explanations")
 }
 
 model DocumentAccess {
-  id            Int      @id @default(autoincrement())
-  document_id   Int
-  user_id       Int
-  access_type   String   @db.VarChar(20)  // 'view' ou 'download'
-  ip_address    String?  @db.VarChar(45)  // IPv4 ou IPv6
-  user_agent    String?  @db.Text
-  accessed_at   DateTime @default(now())
-  
+  id                 Int      @id @default(autoincrement())
+  document_id        Int
+  user_id            Int
+  access_type        String   @default("view") @db.VarChar(20)
+  ip_address         String?  @db.VarChar(45)
+  user_agent         String?  @db.Text
+  is_offline_attempt Boolean  @default(false)
+  created_at         DateTime @default(now())
+
   // Relations
-  document      Document @relation(fields: [document_id], references: [id], onDelete: Cascade)
-  user          User     @relation("DocumentAccess", fields: [user_id], references: [id], onDelete: Cascade)
-  
+  document           Document @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  user               User     @relation("DocumentAccess", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([document_id])
+  @@index([user_id])
+  @@index([created_at])
+  @@index([is_offline_attempt])
+  @@index([user_id, document_id, created_at])
+  @@map("document_access")
+}
+
+model DocumentAccessLogs {
+  id          Int      @id @default(autoincrement())
+  document_id Int
+  user_id     Int
+  access_type String   @db.VarChar(20)
+  ip_address  String?  @db.VarChar(45)
+  user_agent  String?  @db.Text
+  accessed_at DateTime @default(now())
+
+  // Relations
+  document    Document @relation("DocumentAccessLogs", fields: [document_id], references: [id], onDelete: Cascade)
+  user        User     @relation("DocumentAccessLogs", fields: [user_id], references: [id], onDelete: Cascade)
+
   @@index([document_id])
   @@index([user_id])
   @@index([accessed_at])
   @@map("document_access_logs")
 }
 
-// ============================================================================
-// DEMANDES D'EXAMENS DE LABORATOIRE
-// ============================================================================
+model DocumentSessions {
+  id            Int      @id @default(autoincrement())
+  document_id   Int
+  user_id       Int
+  session_token String   @db.VarChar(64)
+  expires_at    DateTime
+  ip_address    String?  @db.VarChar(45)
+  user_agent    String?  @db.Text
+  created_at    DateTime @default(now())
+
+  // Relations
+  document      Document @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  user          User     @relation("DocumentSessions", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([document_id])
+  @@index([user_id])
+  @@index([session_token])
+  @@index([expires_at])
+  @@map("document_sessions")
+}
 
 model ExamRequest {
-  id              Int           @id @default(autoincrement())
-  patient_id      Int
-  requested_by    Int           // ID du médecin/staff qui demande
-  hospital_id     Int           // Hôpital demandeur
-  laboratory_id   Int           // Laboratoire destinataire
-  processed_by    Int?          // ID du staff labo qui traite
-  
-  // Informations de la demande
-  exam_type       ExamType
-  priority        ExamPriority  @default(normal)
-  status          ExamStatus    @default(pending)
-  
-  // Détails cliniques
-  clinical_info   String        @db.Text  // Informations cliniques
-  requested_tests String        @db.Text  // Tests demandés (JSON)
-  notes           String?       @db.Text  // Notes additionnelles
-  
-  // Dates importantes
-  requested_at    DateTime      @default(now())
-  scheduled_at    DateTime?     // Date prévue de l'examen
-  completed_at    DateTime?     // Date de réalisation
-  results_ready_at DateTime?    // Date des résultats
-  
-  // Métadonnées
-  created_at      DateTime      @default(now())
-  updated_at      DateTime      @updatedAt
-  
+  id               Int          @id @default(autoincrement())
+  patient_id       Int
+  requested_by     Int
+  hospital_id      Int
+  laboratory_id    Int
+  processed_by     Int?
+  exam_type        ExamType
+  priority         ExamPriority @default(normal)
+  status           ExamStatus   @default(pending)
+  clinical_info    String       @db.Text
+  requested_tests  String       @db.Text
+  notes            String?      @db.Text
+  requested_at     DateTime     @default(now())
+  scheduled_at     DateTime?
+  completed_at     DateTime?
+  results_ready_at DateTime?
+  created_at       DateTime     @default(now())
+  updated_at       DateTime     @updatedAt
+
   // Relations
   patient         Patient       @relation(fields: [patient_id], references: [id], onDelete: Cascade)
   requester       User          @relation("ExamRequester", fields: [requested_by], references: [id], onDelete: Restrict)
@@ -250,62 +241,52 @@ model ExamRequest {
   hospital        Hospital      @relation("HospitalExamRequests", fields: [hospital_id], references: [id], onDelete: Restrict)
   laboratory      Laboratory    @relation("LaboratoryExamRequests", fields: [laboratory_id], references: [id], onDelete: Restrict)
   status_history  ExamStatusHistory[]
-  
+
   @@index([patient_id])
   @@index([status])
   @@index([requested_at])
   @@index([hospital_id])
   @@index([laboratory_id])
+  @@index([processed_by], map: "exam_requests_processed_by_fkey")
+  @@index([requested_by], map: "exam_requests_requested_by_fkey")
   @@map("exam_requests")
 }
 
 model ExamStatusHistory {
-  id              Int         @id @default(autoincrement())
+  id              Int        @id @default(autoincrement())
   exam_request_id Int
   status          ExamStatus
   changed_by      Int
-  notes           String?     @db.Text
-  changed_at      DateTime    @default(now())
-  
+  notes           String?    @db.Text
+  changed_at      DateTime   @default(now())
+
   // Relations
   exam_request    ExamRequest @relation(fields: [exam_request_id], references: [id], onDelete: Cascade)
-  
+
   @@index([exam_request_id])
   @@index([changed_at])
   @@map("exam_status_history")
 }
 
-// ============================================================================
-// SYSTÈME DE NOTIFICATIONS
-// ============================================================================
-
 model Notification {
-  id              Int               @id @default(autoincrement())
-  user_id         Int               // Destinataire de la notification
-  type            NotificationType  // Type de notification
-  title           String            @db.VarChar(191)
-  message         String            @db.Text
-  
-  // Données contextuelles (JSON)
-  data            String?           @db.Text  // Informations supplémentaires
-  
-  // Références optionnelles vers les entités liées
-  related_message_id    Int?        // ID du message lié
-  related_document_id   Int?        // ID du document lié
-  related_exam_id       Int?        // ID de la demande d'examen liée
-  
-  // Statut de la notification
-  is_read         Boolean           @default(false)
-  is_sent         Boolean           @default(false)  // Pour les notifications push/email
-  
-  // Métadonnées
-  created_at      DateTime          @default(now())
-  read_at         DateTime?         // Date de lecture
-  sent_at         DateTime?         // Date d'envoi push/email
-  
+  id                  Int              @id @default(autoincrement())
+  user_id             Int
+  type                NotificationType
+  title               String
+  message             String           @db.Text
+  data                String?          @db.Text
+  related_message_id  Int?
+  related_document_id Int?
+  related_exam_id     Int?
+  is_read             Boolean          @default(false)
+  is_sent             Boolean          @default(false)
+  created_at          DateTime         @default(now())
+  read_at             DateTime?
+  sent_at             DateTime?
+
   // Relations
-  user            User              @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  
+  user                User             @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
   @@index([user_id])
   @@index([type])
   @@index([is_read])
@@ -314,137 +295,107 @@ model Notification {
 }
 
 model NotificationSettings {
-  id                    Int     @id @default(autoincrement())
-  user_id               Int     @unique
-  
-  // Préférences par type de notification
-  new_message_enabled   Boolean @default(true)
-  new_document_enabled  Boolean @default(true)
-  exam_status_enabled   Boolean @default(true)
-  
-  // Canaux de notification
-  in_app_enabled        Boolean @default(true)
-  email_enabled         Boolean @default(true)
-  push_enabled          Boolean @default(false)
-  
-  // Fréquence des notifications email
-  email_frequency       EmailFrequency @default(immediate)
-  
-  // Heures de silence (format HH:MM)
-  quiet_hours_start     String? @db.VarChar(5)   // Ex: "22:00"
-  quiet_hours_end       String? @db.VarChar(5)   // Ex: "08:00"
-  
-  // Métadonnées
-  created_at            DateTime @default(now())
-  updated_at            DateTime @updatedAt
-  
+  id                   Int            @id @default(autoincrement())
+  user_id              Int            @unique
+  new_message_enabled  Boolean        @default(true)
+  new_document_enabled Boolean        @default(true)
+  exam_status_enabled  Boolean        @default(true)
+  in_app_enabled       Boolean        @default(true)
+  email_enabled        Boolean        @default(true)
+  push_enabled         Boolean        @default(false)
+  email_frequency      EmailFrequency @default(immediate)
+  quiet_hours_start    String?        @db.VarChar(5)
+  quiet_hours_end      String?        @db.VarChar(5)
+  created_at           DateTime       @default(now())
+  updated_at           DateTime       @updatedAt
+
   // Relations
-  user                  User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  
+  user                 User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
   @@map("notification_settings")
 }
 
-// ============================================================================
-// MESSAGERIE BASIQUE
-// ============================================================================
-
 model Conversation {
-  id          Int       @id @default(autoincrement())
-  title       String?   @db.VarChar(191)  // 191 pour compatibilité
-  created_by  Int
-  created_at  DateTime  @default(now())
-  
+  id         Int      @id @default(autoincrement())
+  title      String?
+  created_by Int
+  created_at DateTime @default(now())
+
   // Relations
   messages    Message[]
   participants ConversationParticipant[]
-  
+
   @@map("conversations")
 }
 
 model ConversationParticipant {
-  id              Int          @id @default(autoincrement())
+  id              Int      @id @default(autoincrement())
   conversation_id Int
   user_id         Int
-  joined_at       DateTime     @default(now())
-  
+  joined_at       DateTime @default(now())
+
   // Relations
   conversation    Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
   user            User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  
+
   @@unique([conversation_id, user_id])
+  @@index([user_id], map: "conversation_participants_user_id_fkey")
   @@map("conversation_participants")
 }
 
 model Message {
-  id              Int          @id @default(autoincrement())
+  id              Int      @id @default(autoincrement())
   conversation_id Int
   sender_id       Int
-  content         String       @db.Text
-  created_at      DateTime     @default(now())
-  
+  content         String   @db.Text
+  created_at      DateTime @default(now())
+
   // Relations
   conversation    Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
   sender          User         @relation(fields: [sender_id], references: [id], onDelete: Cascade)
-  
+
   @@index([conversation_id, created_at])
+  @@index([sender_id], map: "messages_sender_id_fkey")
   @@map("messages")
 }
 
-// ============================================================================
-// CHAT MÉDICAL AVEC BOT IA
-// ============================================================================
-
 model MedicalChatSession {
-  id              Int       @id @default(autoincrement())
-  patient_id      Int       // Seuls les patients peuvent utiliser le bot médical
-  session_title   String?   @db.VarChar(191)  // Titre généré automatiquement
-  
-  // Statut de la session
-  is_active       Boolean   @default(true)
-  
-  // Métadonnées
-  created_at      DateTime  @default(now())
-  updated_at      DateTime  @updatedAt
-  ended_at        DateTime? // Date de fin de session
-  
+  id            Int       @id @default(autoincrement())
+  patient_id    Int
+  session_title String?
+  is_active     Boolean   @default(true)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  ended_at      DateTime?
+
   // Relations
-  patient         Patient   @relation(fields: [patient_id], references: [id], onDelete: Cascade)
-  messages        MedicalChatMessage[]
-  
+  patient       Patient   @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+  messages      MedicalChatMessage[]
+
   @@index([patient_id])
   @@index([created_at])
   @@map("medical_chat_sessions")
 }
 
 model MedicalChatMessage {
-  id              Int                 @id @default(autoincrement())
-  session_id      Int
-  sender_type     ChatSenderType      // 'patient' ou 'bot'
-  content         String              @db.Text
-  
-  // Métadonnées du message bot
-  model_used      String?             @db.VarChar(100)  // Modèle IA utilisé
-  tokens_used     Int?                // Nombre de tokens consommés
-  response_time   Int?                // Temps de réponse en ms
-  
-  // Contexte médical (pour le bot)
-  medical_context String?             @db.Text  // Contexte médical utilisé (JSON)
-  confidence_score Float?             // Score de confiance de la réponse
-  
-  // Métadonnées
-  created_at      DateTime            @default(now())
-  
+  id               Int            @id @default(autoincrement())
+  session_id       Int
+  sender_type      ChatSenderType
+  content          String         @db.Text
+  model_used       String?        @db.VarChar(100)
+  tokens_used      Int?
+  response_time    Int?
+  medical_context  String?        @db.Text
+  confidence_score Float?
+  created_at       DateTime       @default(now())
+
   // Relations
-  session         MedicalChatSession  @relation(fields: [session_id], references: [id], onDelete: Cascade)
-  
+  session          MedicalChatSession @relation(fields: [session_id], references: [id], onDelete: Cascade)
+
   @@index([session_id])
   @@index([created_at])
   @@map("medical_chat_messages")
 }
-
-// ============================================================================
-// ENUMS SIMPLIFIÉS
-// ============================================================================
 
 enum UserRole {
   patient
@@ -523,15 +474,3 @@ enum ChatSenderType {
   patient
   bot
 }
-
-// ============================================================================
-// NOTES MVP CORRIGÉES
-// ============================================================================
-
-// 1. VARCHAR(191) au lieu de VARCHAR(255) pour compatibilité MySQL utf8mb4
-// 2. Structure ultra-simplifiée pour un déploiement rapide
-// 3. Géolocalisation basique avec Float (pas de PostGIS)
-// 4. Messagerie simple sans statuts de lecture
-// 5. Documents basiques sans permissions complexes
-// 6. Pas de notifications push (à ajouter plus tard)
-// 7. Pas d'examens/rendez-vous (à ajouter plus tard)
