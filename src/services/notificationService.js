@@ -110,10 +110,14 @@ const getDocumentAccessUsers = async (documentId) => {
     const users = new Set();
     
     // Patient propriétaire
-    users.add(document.patient.user.id);
+    if (document.patient && document.patient.user) {
+      users.add(document.patient.user.id);
+    }
     
     // Utilisateur qui a uploadé
-    users.add(document.uploader.id);
+    if (document.uploader) {
+      users.add(document.uploader.id);
+    }
     
     // Personnel de l'hôpital
     if (document.hospital) {
@@ -166,17 +170,27 @@ const getConversationParticipants = async (conversationId) => {
  */
 const sendPushNotification = async (userId, notification) => {
   try {
+    // Vérifier d'abord les paramètres de notification
     const settings = await prisma.notificationSettings.findUnique({
       where: { user_id: userId }
     });
 
+    // Ne pas envoyer si les notifications push sont désactivées
     if (!settings || !settings.push_enabled) {
+      console.log(`Push notifications disabled for user ${userId}`);
+      return false;
+    }
+
+    // Ne pas envoyer si on est dans les heures de silence
+    if (isInQuietHours(settings)) {
+      console.log(`Silent hours for user ${userId}, push notification not sent`);
       return false;
     }
 
     // Simulation d'envoi de notification push
     console.log(`\uD83D\uDCF1 Push notification to user ${userId}: ${notification.title}`);
 
+    // Marquer la notification comme envoyée
     await prisma.notification.update({
       where: { id: notification.id },
       data: {
@@ -204,6 +218,7 @@ const createNotification = async (userId, type, title, message, data = null, rel
     // Vérifier si les notifications sont activées pour cet utilisateur
     const isEnabled = await isNotificationEnabled(userId, type);
     if (!isEnabled) {
+      console.log(`Notifications disabled for user ${userId}, type: ${type}`);
       return null;
     }
 
@@ -219,6 +234,7 @@ const createNotification = async (userId, type, title, message, data = null, rel
         related_exam_id: relatedIds.examId || null
       }
     });
+    
     // Tentative d'envoi push
     await sendPushNotification(userId, notification);
 
@@ -521,7 +537,7 @@ const createDefaultNotificationSettings = async (userId) => {
         exam_status_enabled: true,
         in_app_enabled: true,
         email_enabled: true,
-        push_enabled: false,
+        push_enabled: false, // Par défaut, les notifications push sont désactivées
         email_frequency: 'immediate'
       }
     });

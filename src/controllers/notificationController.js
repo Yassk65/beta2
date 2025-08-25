@@ -321,7 +321,7 @@ const getNotificationSettings = async (req, res) => {
           exam_status_enabled: true,
           in_app_enabled: true,
           email_enabled: true,
-          push_enabled: false,
+          push_enabled: false, // Par défaut, les notifications push sont désactivées
           email_frequency: 'immediate'
         }
       });
@@ -363,12 +363,12 @@ const updateNotificationSettingsController = async (req, res) => {
     const updateData = {};
     
     // Mise à jour sélective des champs fournis
-    if (new_message_enabled !== undefined) updateData.new_message_enabled = new_message_enabled;
-    if (new_document_enabled !== undefined) updateData.new_document_enabled = new_document_enabled;
-    if (exam_status_enabled !== undefined) updateData.exam_status_enabled = exam_status_enabled;
-    if (in_app_enabled !== undefined) updateData.in_app_enabled = in_app_enabled;
-    if (email_enabled !== undefined) updateData.email_enabled = email_enabled;
-    if (push_enabled !== undefined) updateData.push_enabled = push_enabled;
+    if (new_message_enabled !== undefined) updateData.new_message_enabled = Boolean(new_message_enabled);
+    if (new_document_enabled !== undefined) updateData.new_document_enabled = Boolean(new_document_enabled);
+    if (exam_status_enabled !== undefined) updateData.exam_status_enabled = Boolean(exam_status_enabled);
+    if (in_app_enabled !== undefined) updateData.in_app_enabled = Boolean(in_app_enabled);
+    if (email_enabled !== undefined) updateData.email_enabled = Boolean(email_enabled);
+    if (push_enabled !== undefined) updateData.push_enabled = Boolean(push_enabled);
     if (email_frequency !== undefined) updateData.email_frequency = email_frequency;
     if (quiet_hours_start !== undefined) updateData.quiet_hours_start = quiet_hours_start;
     if (quiet_hours_end !== undefined) updateData.quiet_hours_end = quiet_hours_end;
@@ -398,6 +398,7 @@ const updateNotificationSettingsController = async (req, res) => {
 };
 
 // ============================================================================
+
 // EXPORTS
 // ============================================================================
 
